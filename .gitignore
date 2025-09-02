@@ -49,6 +49,9 @@ dmypy.json
 *.swo
 *~
 
+# PR Description (generated)
+PR_DESCRIPTION.md
+
 # Project specific
 storage/datasets/*
 !storage/datasets/.gitkeep
