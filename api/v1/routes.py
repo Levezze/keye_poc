@@ -184,13 +184,13 @@ async def get_schema(dataset_id: str, x_api_key: Optional[str] = Header(default=
         try:
             state = registry.get_dataset_state(dataset_id)
         except ValueError:
-            # Current behavior (captured by tests): return 500 for non-existent datasets
+            # Correct behavior: 404 when dataset does not exist
             raise HTTPException(
-                status_code=500, detail=f"Dataset {dataset_id} not found"
+                status_code=404, detail=f"Dataset {dataset_id} not found"
             )
         if not state["exists"]:
             raise HTTPException(
-                status_code=500, detail=f"Dataset {dataset_id} not found"
+                status_code=404, detail=f"Dataset {dataset_id} not found"
             )
 
         # Get schema
