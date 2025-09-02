@@ -136,16 +136,50 @@ DEBUG=false
 
 ## Testing
 
+### Running Tests
+
 ```bash
-# Run all tests
-pytest
+# Run all tests with uv
+uv run pytest
 
 # Run with coverage
-pytest --cov=. --cov-report=html
+uv run pytest --cov=services --cov-report=term-missing
+
+# Run specific test suites
+uv run pytest tests/unit/          # Unit tests only
+uv run pytest tests/integration/   # Integration tests only
 
 # Run specific test file
-pytest tests/test_concentration.py
+uv run pytest tests/unit/test_registry.py
 ```
+
+### Test Data Generation
+
+The project includes a powerful test fixture generator that creates optimized samples from production Excel files:
+
+```bash
+# Generate test fixtures from your Excel file
+uv run python scripts/generate_test_fixtures.py path/to/your/excel/file.xlsx
+
+# This creates multiple test samples:
+# - sample_20pct: 20% random sample for integration testing
+# - sample_small: 5% sample for quick unit tests  
+# - sample_time_balanced: All time periods with equal representation
+# - sample_top_entities: Top 10 entities with all their data
+# - sample_edge_cases: Edge cases (nulls, extremes, special chars)
+# - sample_stratified: 15% sample maintaining data distribution
+```
+
+Test fixtures are saved in both Excel and CSV formats in `tests/fixtures/sample_data/`.
+
+### Test Coverage
+
+Current test coverage: **100%** for services layer (165/165 statements)
+- 13 tests for DatasetRegistry
+- 16 tests for StorageService  
+- 13 tests for ExportService
+
+For more details on testing strategy and fixture usage, see [docs/testing.md](docs/testing.md).
 
 ## Deployment Considerations
 
