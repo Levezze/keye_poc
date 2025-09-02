@@ -137,16 +137,19 @@ class TestFixtureGenerator:
         # Filter for top entities
         return self.df[self.df[group_col].isin(top_entities)]
     
-    def edge_cases_sample(self) -> pd.DataFrame:
+    def edge_cases_sample(self, force_nulls: bool = True) -> pd.DataFrame:
         """
         Create a sample focusing on edge cases.
         
+        Args:
+            force_nulls: If True, artificially add nulls if none exist in source data
+        
         Returns:
-            DataFrame with edge cases
+            DataFrame with edge cases including nulls
         """
         edge_cases = []
         
-        # Add rows with null values
+        # Add rows with null values (existing nulls from source data)
         null_mask = self.df.isnull().any(axis=1)
         if null_mask.any():
             edge_cases.append(self.df[null_mask].head(5))
@@ -167,11 +170,20 @@ class TestFixtureGenerator:
                 if special_mask.any():
                     edge_cases.append(self.df[special_mask].head(3))
         
+        # Create base edge cases DataFrame
         if edge_cases:
-            return pd.concat(edge_cases, ignore_index=True).drop_duplicates()
+            edge_df = pd.concat(edge_cases, ignore_index=True).drop_duplicates()
         else:
-            print("No edge cases found, returning small random sample")
-            return self.random_sample(5)
+            print("No natural edge cases found, using random sample as base")
+            edge_df = self.random_sample(10)
+        
+        # If no nulls exist and force_nulls is True, add some artificial nulls
+        if force_nulls and not edge_df.isnull().any().any():
+            print("Adding artificial nulls to edge cases sample")
+            # Add random nulls to ensure edge case testing includes null handling
+            edge_df = self.add_random_nulls(edge_df, null_percentage=15, preserve_key_columns=True)
+        
+        return edge_df
     
     def stratified_sample(self, percentage: float = 20.0) -> pd.DataFrame:
         """
@@ -204,6 +216,87 @@ class TestFixtureGenerator:
                 sampled_dfs.append(group_df.sample(n=sample_size, random_state=self.seed))
         
         return pd.concat(sampled_dfs, ignore_index=True)
+    
+    def add_random_nulls(self, df: pd.DataFrame, null_percentage: float = 10.0, 
+                        columns: Optional[list] = None, preserve_key_columns: bool = True) -> pd.DataFrame:
+        """
+        Add random null values to a DataFrame.
+        
+        Args:
+            df: DataFrame to add nulls to
+            null_percentage: Percentage of values to make null in each target column
+            columns: Optional list of columns to add nulls to (default: all columns)
+            preserve_key_columns: Whether to preserve key columns (time, primary group) from nulls
+        
+        Returns:
+            DataFrame with added null values
+        """
+        df_with_nulls = df.copy()
+        
+        # Determine which columns to add nulls to
+        target_columns = columns if columns else df.columns.tolist()
+        
+        # Remove key columns if preserve_key_columns is True
+        if preserve_key_columns:
+            exclude = []
+            # Preserve time column
+            if self.time_column and self.time_column in target_columns:
+                exclude.append(self.time_column)
+            # Preserve first group column (like customer ID)
+            if self.group_columns and self.group_columns[0] in target_columns:
+                exclude.append(self.group_columns[0])
+            
+            target_columns = [c for c in target_columns if c not in exclude]
+        
+        # Add nulls to each target column
+        for col in target_columns:
+            if len(df) == 0:
+                continue
+            
+            n_nulls = max(1, int(len(df) * null_percentage / 100))  # At least 1 null
+            n_nulls = min(n_nulls, len(df))  # Don't exceed available rows
+            
+            null_indices = np.random.choice(df.index, size=n_nulls, replace=False)
+            df_with_nulls.loc[null_indices, col] = np.nan
+        
+        return df_with_nulls
+    
+    def add_single_column_nulls(self, df: pd.DataFrame, column: str, 
+                               null_percentage: float = 20.0, 
+                               pattern: str = 'random') -> pd.DataFrame:
+        """
+        Add null values to a single column with configurable patterns.
+        
+        Args:
+            df: DataFrame to add nulls to
+            column: Name of the column to add nulls to
+            null_percentage: Percentage of values in the column to make null
+            pattern: Pattern for adding nulls ('random', 'first_n', 'last_n', 'every_nth')
+        
+        Returns:
+            DataFrame with nulls added to the specified column
+        """
+        if column not in df.columns:
+            raise ValueError(f"Column '{column}' not found in DataFrame")
+        
+        df_with_nulls = df.copy()
+        n_nulls = max(1, int(len(df) * null_percentage / 100))  # At least 1 null
+        n_nulls = min(n_nulls, len(df))  # Don't exceed available rows
+        
+        if pattern == 'random':
+            null_indices = np.random.choice(df.index, size=n_nulls, replace=False)
+        elif pattern == 'first_n':
+            null_indices = df.index[:n_nulls]
+        elif pattern == 'last_n':
+            null_indices = df.index[-n_nulls:]
+        elif pattern == 'every_nth':
+            step = max(1, len(df) // n_nulls)
+            null_indices = df.index[::step][:n_nulls]
+        else:
+            raise ValueError(f"Unknown pattern '{pattern}'. Use 'random', 'first_n', 'last_n', or 'every_nth'")
+        
+        df_with_nulls.loc[null_indices, column] = np.nan
+        return df_with_nulls
     
     def save_sample(self, df: pd.DataFrame, name: str, description: str) -> Dict[str, Any]:
         """
@@ -319,6 +412,27 @@ class TestFixtureGenerator:
             metadata["fixtures"].append(
                 self.save_sample(df_stratified, "sample_stratified", 
                                "15% stratified sample maintaining group distribution")
+            )
+        
+        # 7. Sample with random nulls across columns
+        print("\n7. Creating sample with random nulls...")
+        df_with_nulls = self.add_random_nulls(self.random_sample(10), null_percentage=12)
+        metadata["fixtures"].append(
+            self.save_sample(df_with_nulls, "sample_with_nulls", 
+                           "10% sample with 12% random nulls across columns (excluding keys)")
+        )
+        
+        # 8. Sample with nulls in single column (first value column if available)
+        if self.value_columns:
+            print("\n8. Creating sample with single-column nulls...")
+            df_single_null = self.add_single_column_nulls(
+                self.random_sample(8), 
+                column=self.value_columns[0], 
+                null_percentage=25
+            )
+            metadata["fixtures"].append(
+                self.save_sample(df_single_null, "sample_single_null_column", 
+                               f"8% sample with 25% nulls in '{self.value_columns[0]}' column")
             )
         
         # Save metadata

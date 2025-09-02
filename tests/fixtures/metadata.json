@@ -4,7 +4,7 @@
     17677,
     9
   ],
-  "generated_at": "2025-09-02T13:14:02.837234",
+  "generated_at": "2025-09-02T16:24:12.927559",
   "seed": 42,
   "detected_columns": {
     "time": "Month",
@@ -92,12 +92,12 @@
       "columns": 9,
       "excel": {
         "path": "sample_data/sample_edge_cases.xlsx",
-        "size_bytes": 6310,
+        "size_bytes": 6281,
         "checksum": "tests/fixtures/sample_data/sample_edge_cases.xlsx"
       },
       "csv": {
         "path": "sample_data/sample_edge_cases.csv",
-        "size_bytes": 1520,
+        "size_bytes": 1427,
         "checksum": "tests/fixtures/sample_data/sample_edge_cases.csv"
       }
     },
@@ -115,6 +115,38 @@
         "path": "sample_data/sample_stratified.csv",
         "size_bytes": 352451,
         "checksum": "tests/fixtures/sample_data/sample_stratified.csv"
+      }
+    },
+    {
+      "name": "sample_with_nulls",
+      "description": "10% sample with 12% random nulls across columns (excluding keys)",
+      "rows": 1767,
+      "columns": 9,
+      "excel": {
+        "path": "sample_data/sample_with_nulls.xlsx",
+        "size_bytes": 91131,
+        "checksum": "tests/fixtures/sample_data/sample_with_nulls.xlsx"
+      },
+      "csv": {
+        "path": "sample_data/sample_with_nulls.csv",
+        "size_bytes": 218493,
+        "checksum": "tests/fixtures/sample_data/sample_with_nulls.csv"
+      }
+    },
+    {
+      "name": "sample_single_null_column",
+      "description": "8% sample with 25% nulls in 'Revenue' column",
+      "rows": 1414,
+      "columns": 9,
+      "excel": {
+        "path": "sample_data/sample_single_null_column.xlsx",
+        "size_bytes": 75786,
+        "checksum": "tests/fixtures/sample_data/sample_single_null_column.xlsx"
+      },
+      "csv": {
+        "path": "sample_data/sample_single_null_column.csv",
+        "size_bytes": 186739,
+        "checksum": "tests/fixtures/sample_data/sample_single_null_column.csv"
       }
     }
   ]

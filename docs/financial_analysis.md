@@ -42,11 +42,67 @@ Headers vary wildly (`Revenue (USD)`, `Rev_Q1`, `REVENUE_2024`), requiring robus
 - Normalize to decimal `[0,1]`: `85%` → `0.85`
 - Schema marks `representation: "percent"` for export formatting
 
+### Regex Patterns for Normalization
+
+#### Currency Value Detection
+```regex
+# US-style: $1,234.56 or (1,234.56), optional symbol prefix/suffix, optional scale
+^(?P<neg>\()?\s*(?P<cur>[\$€£¥])?\s*
+(?P<num>(?:\d{1,3}(?:[,\s\u00A0\u202F]\d{3})+|\d+)(?:\.\d+)?|\d+(?:\.\d+)?)
+\s*(?P<cur_suf>[\$€£¥])?\s*(?P<scale>k|K|m|M|mm|b|B|bn)?\s*(?(neg)\))$
+
+# EU-style: € 1.234,56 or (1.234,56) €, space/period thousands, comma decimal
+^(?P<neg>\()?\s*(?P<cur>[\$€£¥])?\s*
+(?P<num>(?:\d{1,3}(?:[.\s\u00A0\u202F]\d{3})+|\d+)(?:,\d+)?|\d+(?:,\d+)?)
+\s*(?P<cur_suf>[\$€£¥])?\s*(?P<scale>k|K|m|M|mm|b|B|bn)?\s*(?(neg)\))$
+```
+
+#### Percent Detection
+```regex
+# Value-level: numeric with % suffix
+^\s*[+\-\u2212]?\d+(?:[.,]\d+)?\s*%\s*$
+
+# Header-level hint (case-insensitive)
+(?i)\b(percent|pct|percentage)\b
+```
+
+#### Unicode Minus Detection
+```regex
+# Normalize Unicode minus (U+2212) to ASCII hyphen
+^\s*[\u2212-]
+```
+
+#### Time Column Detection
+```regex
+# Date-like column names (case-insensitive)
+(?i)\b(date|dt|as_of|posting_date|transaction_date)\b
+
+# Year values (4-digit starting with 19 or 20)
+^(19|20)\d{2}$
+
+# Month names (abbreviated and full, case-insensitive)
+(?i)\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)\b
+
+# Quarter forms (Q1-Q4 or quarter word, case-insensitive)
+(?i)\bq([1-4])\b|\bquarter\b
+
+# YYYYMM / YYYY-MM / MM/YYYY detection (values)
+^(?:\d{4}[-/]?(0[1-9]|1[0-2])|(?:0[1-9]|1[0-2])[-/](19|20)\d{2})$
+```
+
+These patterns handle:
+- **Currency**: Multiple symbols, prefix/suffix positions, scaling suffixes (k/K/m/M/mm/b/B/bn)
+- **Spaces**: Regular, non-breaking (\u00A0), and narrow no-break (\u202F) spaces as thousands separators
+- **Locales**: US format (comma thousands, period decimal) vs EU format (period/space thousands, comma decimal)
+- **Negatives**: Parentheses notation and Unicode minus signs
+- **Percent**: Explicit % symbols and header-based inference for values in [0,100] range
+
 ### Negative Value Policy
-**Allowlist approach** for negative-allowed columns:
-- Revenue metrics: flag negatives (likely returns/adjustments)
+**Corrected allowlist approach** for negative-allowed columns:
+- Revenue metrics: **always flag negatives** (likely returns/adjustments requiring review)
 - Cost/expense columns: allow negatives (credits/reversals)
 - Margin columns: allow negatives (unprofitable segments)
+- Adjustment columns: allow negatives (corrections)
 
 ### Header Cleanup
 1. Trim whitespace, convert to lowercase
