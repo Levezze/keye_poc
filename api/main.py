@@ -1,9 +1,11 @@
 """
 Keye POC API - Main FastAPI Application
 """
+
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from config.settings import settings
 from api.v1.routes import router as v1_router
 
 
@@ -21,15 +23,16 @@ app = FastAPI(
     title="Keye POC API",
     description="Data analysis pipeline with concentration analysis and AI insights",
     version="0.1.0",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 # Configure CORS
+# Configure CORS from settings
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
+    allow_origins=settings.allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -50,5 +53,5 @@ async def root():
         "service": "Keye POC API",
         "version": "0.1.0",
         "docs": "/docs",
-        "health": "/health"
+        "health": "/health",
     }
