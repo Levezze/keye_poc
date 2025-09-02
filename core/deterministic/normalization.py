@@ -8,6 +8,7 @@ import re
 from typing import Dict, Any, List, Tuple, Optional
 from dataclasses import dataclass
 from datetime import datetime
+from config.settings import settings
 
 
 @dataclass
@@ -47,8 +48,9 @@ class DataNormalizer:
         })
         
         # 2. Detect and coerce types with comprehensive tracking
-        df_normalized, type_transformations = self._detect_and_coerce_types(df_normalized)
+        df_normalized, type_transformations, type_warnings = self._detect_and_coerce_types(df_normalized)
         transformations.extend(type_transformations)
+        warnings.extend(type_warnings)
         
         # 3. Apply domain rules
         domain_results = self._apply_domain_rules(df_normalized)
@@ -115,6 +117,7 @@ class DataNormalizer:
     def _detect_and_coerce_types(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, List[Dict[str, Any]]]:
         """Detect and coerce column types with comprehensive tracking."""
         transformations = []
+        warnings = []
         
         for col in df.columns:
             original_dtype = str(df[col].dtype)
@@ -130,6 +133,11 @@ class DataNormalizer:
                     "new_dtype": "float64",
                     "counters": numeric_counters
                 })
+                
+                # Check for mixed decimal conventions
+                if numeric_counters.get('decimal_convention') == 'mixed':
+                    warnings.append(f"Column '{col}' contains mixed decimal conventions (both US and EU formats)")
+                
                 continue
             
             # Try percent normalization
@@ -170,7 +178,7 @@ class DataNormalizer:
                     "counters": boolean_counters
                 })
         
-        return df, transformations
+        return df, transformations, warnings
     
     def _coerce_numeric(self, series: pd.Series, col_name: str) -> Tuple[pd.Series, Dict[str, Any]]:
         """Coerce series to numeric with comprehensive tracking."""
@@ -182,6 +190,7 @@ class DataNormalizer:
             'unicode_minus_normalized': 0,
             'failed_numeric_coercions': 0,
             'decimal_convention': None,
+            'decimal_conventions_seen': set(),
             'currencies_detected': set(),
             'multi_currency': False
         }
@@ -205,7 +214,6 @@ class DataNormalizer:
                 counters['unicode_minus_normalized'] += 1
             
             # Detect currency symbols (including in text like CHF)
-            currency_pattern = r'[\$€£¥]|CHF|USD|EUR|GBP|JPY'
             currency_matches = re.findall(r'[\$€£¥]', val_str)
             if currency_matches:
                 for curr in currency_matches:
@@ -258,19 +266,19 @@ class DataNormalizer:
                     if val_str.rindex('.') > val_str.rindex(','):
                         # US style: 1,234.56
                         val_str = val_str.replace(',', '')
-                        counters['decimal_convention'] = 'US'
+                        counters['decimal_conventions_seen'].add('US')
                     else:
                         # EU style: 1.234,56
                         val_str = val_str.replace('.', '').replace(',', '.')
-                        counters['decimal_convention'] = 'EU'
+                        counters['decimal_conventions_seen'].add('EU')
                 elif ',' in val_str:
                     # Check if comma is decimal (1-2 digits after)
                     if re.search(r',\d{1,2}$', val_str):
                         val_str = val_str.replace(',', '.')
-                        counters['decimal_convention'] = 'EU'
+                        counters['decimal_conventions_seen'].add('EU')
                     else:
                         val_str = val_str.replace(',', '')
-                        counters['decimal_convention'] = 'US'
+                        counters['decimal_conventions_seen'].add('US')
                 
                 result = float(val_str)
                 if scale_applied:
@@ -285,12 +293,21 @@ class DataNormalizer:
         
         result = series.apply(parse_value)
         
+        # Determine final decimal convention
+        if len(counters['decimal_conventions_seen']) == 0:
+            counters['decimal_convention'] = None
+        elif len(counters['decimal_conventions_seen']) == 1:
+            counters['decimal_convention'] = list(counters['decimal_conventions_seen'])[0]
+        else:
+            counters['decimal_convention'] = 'mixed'
+        
         # Set multi-currency flag
         if len(counters['currencies_detected']) > 1:
             counters['multi_currency'] = True
             
-        # Convert set to list for JSON serialization
+        # Convert sets to lists for JSON serialization
         counters['currencies_detected'] = list(counters['currencies_detected'])
+        counters['decimal_conventions_seen'] = list(counters['decimal_conventions_seen'])
         
         return result, counters
     
@@ -302,7 +319,7 @@ class DataNormalizer:
         }
         
         # Check header for percent hint - be more permissive
-        has_pct_header = bool(re.search(r'(?i)(percent|pct|percentage)', col_name))
+        has_pct_header = bool(re.search(r'(?i)(percent|pct|percentage|%|rate|ratio|margin)', col_name))
         
         def parse_percent(val):
             if pd.isna(val) or val == '' or str(val).strip() == '':
@@ -328,8 +345,8 @@ class DataNormalizer:
                     else:
                         num = float(val_str)
                     
-                    # If in typical percentage range [0, 100], normalize to decimal
-                    if 0 <= num <= 100:
+                    # Only normalize if value > 1 (don't rescale values already in [0,1])
+                    if 1 < num <= 100:
                         counters['percent_normalized'] += 1
                         return num / 100.0
                 except:
@@ -339,7 +356,8 @@ class DataNormalizer:
         
         result = series.apply(parse_percent)
         
-        if counters['percent_normalized'] > 0:
+        # Set representation if header suggests percent or if normalization occurred
+        if counters['percent_normalized'] > 0 or has_pct_header:
             counters['representation'] = 'percent'
             
         return result, counters
@@ -348,7 +366,6 @@ class DataNormalizer:
         """Coerce to datetime with explicit locale handling."""
         counters = {
             'datetime_parsed': 0,
-            'ambiguous_dates': 0,
             'parsing_errors': 0
         }
         
@@ -446,8 +463,10 @@ class DataNormalizer:
     def _apply_domain_rules(self, df: pd.DataFrame) -> Dict[str, Any]:
         """Apply domain-specific rules with corrected negative policy."""
         # CORRECTED: revenue NOT in allowlist - always flag negative revenues
-        negative_allowed = ['gross_profit', 'net_income', 'cost', 'expense', 'adjustments', 
-                           'margin', 'ebitda', 'ebit', 'profit', 'loss']
+        # Merge hardcoded financial terms with configurable settings
+        financial_negative_allowed = ['gross_profit', 'net_income', 'cost', 'expense', 'adjustments', 
+                                    'margin', 'ebitda', 'ebit', 'profit', 'loss']
+        negative_allowed = financial_negative_allowed + settings.negative_allowed_columns
         
         warnings = []
         anomalies = {}
@@ -581,6 +600,12 @@ class DataNormalizer:
             # Add decimal convention if available
             if 'decimal_convention' in col_coercions:
                 col_info['decimal_convention'] = col_coercions['decimal_convention']
+            
+            # Add currency information if available
+            if 'currencies_detected' in col_coercions:
+                col_info['currencies_detected'] = col_coercions['currencies_detected']
+            if 'multi_currency' in col_coercions:
+                col_info['multi_currency'] = col_coercions['multi_currency']
             
             columns_info.append(col_info)
         

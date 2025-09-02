@@ -118,11 +118,15 @@ class TestDataNormalizer:
         header_data = pd.Series([85, 12.5, 0.5, 100])
         result2, counters2 = self.normalizer._normalize_percentages(header_data, "profit_pct")
         
-        # These should be converted from percentage scale to decimal
-        for i, exp in enumerate(expected):
+        # According to ADR: values in [0,1] are left as-is, [1,100] scaled to [0,1]
+        # So 85->0.85, 12.5->0.125, 0.5->0.5 (not 0.005), 100->1.0
+        expected_header = [0.85, 0.125, 0.5, 1.0]
+        for i, exp in enumerate(expected_header):
             assert abs(result2.iloc[i] - exp) < 0.001
         
-        assert counters2['percent_normalized'] == 4
+        # Only values > 1 should be normalized
+        assert counters2['percent_normalized'] == 3  # 85, 12.5, 100 (not 0.5)
+        assert counters2['representation'] == 'percent'  # Should still be marked as percent
     
     def test_datetime_coercion(self):
         """Test datetime parsing."""
