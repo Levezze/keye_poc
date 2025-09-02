@@ -1,0 +1,121 @@
+{
+  "source_file": "docs/instructions/KeyeExcelTakeHomeInput.xlsx",
+  "source_shape": [
+    17677,
+    9
+  ],
+  "generated_at": "2025-09-02T13:14:02.837234",
+  "seed": 42,
+  "detected_columns": {
+    "time": "Month",
+    "groups": [
+      "Customer Code",
+      "Industry",
+      "Revenue Type",
+      "Product",
+      "Product Mix"
+    ],
+    "values": [
+      "Revenue",
+      "Gross Profit"
+    ]
+  },
+  "fixtures": [
+    {
+      "name": "sample_20pct",
+      "description": "20% random sample for general testing",
+      "rows": 3535,
+      "columns": 9,
+      "excel": {
+        "path": "sample_data/sample_20pct.xlsx",
+        "size_bytes": 188738,
+        "checksum": "tests/fixtures/sample_data/sample_20pct.xlsx"
+      },
+      "csv": {
+        "path": "sample_data/sample_20pct.csv",
+        "size_bytes": 479685,
+        "checksum": "tests/fixtures/sample_data/sample_20pct.csv"
+      }
+    },
+    {
+      "name": "sample_small",
+      "description": "5% random sample for quick unit tests",
+      "rows": 883,
+      "columns": 9,
+      "excel": {
+        "path": "sample_data/sample_small.xlsx",
+        "size_bytes": 51982,
+        "checksum": "tests/fixtures/sample_data/sample_small.xlsx"
+      },
+      "csv": {
+        "path": "sample_data/sample_small.csv",
+        "size_bytes": 119904,
+        "checksum": "tests/fixtures/sample_data/sample_small.csv"
+      }
+    },
+    {
+      "name": "sample_time_balanced",
+      "description": "All time periods with 10 rows each",
+      "rows": 120,
+      "columns": 9,
+      "excel": {
+        "path": "sample_data/sample_time_balanced.xlsx",
+        "size_bytes": 12189,
+        "checksum": "tests/fixtures/sample_data/sample_time_balanced.xlsx"
+      },
+      "csv": {
+        "path": "sample_data/sample_time_balanced.csv",
+        "size_bytes": 16124,
+        "checksum": "tests/fixtures/sample_data/sample_time_balanced.csv"
+      }
+    },
+    {
+      "name": "sample_top_entities",
+      "description": "Top 10 entities by value with all their data",
+      "rows": 2602,
+      "columns": 9,
+      "excel": {
+        "path": "sample_data/sample_top_entities.xlsx",
+        "size_bytes": 137811,
+        "checksum": "tests/fixtures/sample_data/sample_top_entities.xlsx"
+      },
+      "csv": {
+        "path": "sample_data/sample_top_entities.csv",
+        "size_bytes": 363711,
+        "checksum": "tests/fixtures/sample_data/sample_top_entities.csv"
+      }
+    },
+    {
+      "name": "sample_edge_cases",
+      "description": "Edge cases including nulls, extremes, and special characters",
+      "rows": 10,
+      "columns": 9,
+      "excel": {
+        "path": "sample_data/sample_edge_cases.xlsx",
+        "size_bytes": 6310,
+        "checksum": "tests/fixtures/sample_data/sample_edge_cases.xlsx"
+      },
+      "csv": {
+        "path": "sample_data/sample_edge_cases.csv",
+        "size_bytes": 1520,
+        "checksum": "tests/fixtures/sample_data/sample_edge_cases.csv"
+      }
+    },
+    {
+      "name": "sample_stratified",
+      "description": "15% stratified sample maintaining group distribution",
+      "rows": 2592,
+      "columns": 9,
+      "excel": {
+        "path": "sample_data/sample_stratified.xlsx",
+        "size_bytes": 133750,
+        "checksum": "tests/fixtures/sample_data/sample_stratified.xlsx"
+      },
+      "csv": {
+        "path": "sample_data/sample_stratified.csv",
+        "size_bytes": 352451,
+        "checksum": "tests/fixtures/sample_data/sample_stratified.csv"
+      }
+    }
+  ]
+}
