@@ -10,6 +10,7 @@ import tempfile
 import os
 import json
 from pathlib import Path
+import re
 
 from config.settings import settings
 from api.v1.models import (
@@ -32,6 +33,14 @@ router = APIRouter()
 def _require_api_key(x_api_key: Optional[str] = Header(default=None)):
     if settings.api_key and x_api_key != settings.api_key:
         raise HTTPException(status_code=401, detail="Unauthorized")
+
+
+_DATASET_ID_PATTERN = re.compile(r"^ds_[a-f0-9]{12}$")
+
+
+def _validate_dataset_id(dataset_id: str) -> None:
+    if not _DATASET_ID_PATTERN.match(dataset_id or ""):
+        raise HTTPException(status_code=400, detail="Invalid dataset ID format")
 
 
 @router.post("/upload", response_model=UploadResponse)
@@ -74,6 +83,10 @@ async def upload_dataset(
         # Save uploaded file
         with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp_file:
             content = await file.read()
+            # Enforce file size limit
+            max_bytes = settings.max_file_size_mb * 1024 * 1024
+            if len(content) > max_bytes:
+                raise HTTPException(status_code=413, detail="File too large")
             tmp_file.write(content)
             tmp_file_path = tmp_file.name
 
@@ -159,6 +172,7 @@ async def get_schema(dataset_id: str, x_api_key: Optional[str] = Header(default=
         Schema information including column types and metadata
     """
     _require_api_key(x_api_key)
+    _validate_dataset_id(dataset_id)
 
     registry = DatasetRegistry()
 
@@ -217,6 +231,7 @@ async def analyze_concentration(
         Concentration analysis results
     """
     _require_api_key(x_api_key)
+    _validate_dataset_id(dataset_id)
 
     registry = DatasetRegistry()
     storage = StorageService()
@@ -404,6 +419,7 @@ async def download_concentration_csv(
         CSV file download
     """
     _require_api_key(x_api_key)
+    _validate_dataset_id(dataset_id)
 
     registry = DatasetRegistry()
     storage = StorageService()
@@ -452,6 +468,7 @@ async def download_concentration_excel(
         Excel file download
     """
     _require_api_key(x_api_key)
+    _validate_dataset_id(dataset_id)
 
     registry = DatasetRegistry()
     storage = StorageService()
@@ -500,6 +517,7 @@ async def get_insights(
         AI-generated insights and recommendations
     """
     _require_api_key(x_api_key)
+    _validate_dataset_id(dataset_id)
 
     registry = DatasetRegistry()
     storage = StorageService()
@@ -601,5 +619,6 @@ async def get_lineage(dataset_id: str, x_api_key: Optional[str] = Header(default
         Complete lineage and audit trail
     """
     _require_api_key(x_api_key)
+    _validate_dataset_id(dataset_id)
     # TODO: Implement lineage retrieval
     return {"dataset_id": dataset_id, "created_at": None, "steps": []}

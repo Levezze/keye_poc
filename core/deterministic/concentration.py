@@ -4,7 +4,7 @@ Concentration Analysis Module
 
 import pandas as pd
 import numpy as np
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional, Tuple, cast
 from dataclasses import dataclass
 
 
@@ -51,7 +51,7 @@ class ConcentrationAnalyzer:
             "period_key_column": period_key_column,
             "thresholds": thresholds,
             "total_rows": len(df),
-            "analysis_type": "multi_period" if period_key_column else "single_period"
+            "analysis_type": "multi_period" if period_key_column else "single_period",
         }
 
         computation_log = []
@@ -74,18 +74,20 @@ class ConcentrationAnalyzer:
 
             # Add summary statistics
             results["summary"] = self._generate_summary(results, parameters)
-            computation_log.append({
-                "step": "summary_generation",
-                "status": "completed",
-                "periods_analyzed": len([k for k in results.keys() if k != "summary"])
-            })
+            computation_log.append(
+                {
+                    "step": "summary_generation",
+                    "status": "completed",
+                    "periods_analyzed": len(
+                        [k for k in results.keys() if k != "summary"]
+                    ),
+                }
+            )
 
         except Exception as e:
-            computation_log.append({
-                "step": "analysis_error",
-                "status": "failed",
-                "error": str(e)
-            })
+            computation_log.append(
+                {"step": "analysis_error", "status": "failed", "error": str(e)}
+            )
             results = {"error": str(e)}
 
         formulas = self._document_formulas(thresholds)
@@ -98,7 +100,12 @@ class ConcentrationAnalyzer:
         )
 
     def _analyze_multi_period(
-        self, df: pd.DataFrame, group_by: str, value_col: str, period_col: str, thresholds: List[int]
+        self,
+        df: pd.DataFrame,
+        group_by: str,
+        value_col: str,
+        period_col: str,
+        thresholds: List[int],
     ) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
         """Analyze concentration for each period and overall."""
         results = {}
@@ -106,16 +113,19 @@ class ConcentrationAnalyzer:
 
         # Get unique periods and sort them
         periods = sorted(df[period_col].unique())
-        logs.append({
-            "step": "period_identification",
-            "status": "completed",
-            "periods_found": len(periods),
-            "periods": periods[:10]  # Log first 10 for brevity
-        })
+        logs.append(
+            {
+                "step": "period_identification",
+                "status": "completed",
+                "periods_found": len(periods),
+                "periods": periods[:10],  # Log first 10 for brevity
+            }
+        )
 
         # Analyze each period
         for period in periods:
-            period_df = df[df[period_col] == period]
+            mask = df[period_col] == period
+            period_df = cast(pd.DataFrame, df.loc[mask])
             if len(period_df) > 0:
                 period_result, period_log = self._analyze_single_period(
                     period_df, group_by, value_col, thresholds, period_name=str(period)
@@ -133,7 +143,12 @@ class ConcentrationAnalyzer:
         return results, logs
 
     def _analyze_single_period(
-        self, df: pd.DataFrame, group_by: str, value_col: str, thresholds: List[int], period_name: str
+        self,
+        df: pd.DataFrame,
+        group_by: str,
+        value_col: str,
+        thresholds: List[int],
+        period_name: str,
     ) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
         """Analyze concentration for a single period with deterministic tie-breaking."""
         logs = []
@@ -141,18 +156,22 @@ class ConcentrationAnalyzer:
         # Group and aggregate
         try:
             grouped = df.groupby(group_by)[value_col].sum().reset_index()
-            logs.append({
-                "step": f"aggregation_{period_name}",
-                "status": "completed",
-                "entities_count": len(grouped),
-                "total_value": float(grouped[value_col].sum())
-            })
+            logs.append(
+                {
+                    "step": f"aggregation_{period_name}",
+                    "status": "completed",
+                    "entities_count": len(grouped),
+                    "total_value": float(grouped[value_col].sum()),
+                }
+            )
         except Exception as e:
-            logs.append({
-                "step": f"aggregation_{period_name}",
-                "status": "failed",
-                "error": str(e)
-            })
+            logs.append(
+                {
+                    "step": f"aggregation_{period_name}",
+                    "status": "failed",
+                    "error": str(e),
+                }
+            )
             return {"error": str(e)}, logs
 
         # Handle edge cases
@@ -165,34 +184,41 @@ class ConcentrationAnalyzer:
 
         # Sort with deterministic tie-breaking: value desc, then group_by asc
         grouped_sorted = grouped.sort_values(
-            [value_col, group_by], 
-            ascending=[False, True]
+            [value_col, group_by], ascending=[False, True]
         ).reset_index(drop=True)
 
         # Calculate cumulative sums and percentages
-        grouped_sorted['cumsum'] = grouped_sorted[value_col].cumsum()
-        grouped_sorted['cumulative_pct'] = (grouped_sorted['cumsum'] / total_value) * 100
+        grouped_sorted["cumsum"] = grouped_sorted[value_col].cumsum()
+        grouped_sorted["cumulative_pct"] = (
+            grouped_sorted["cumsum"] / total_value
+        ) * 100
 
         # Calculate concentration thresholds
         concentration = {}
         for threshold in thresholds:
             # Find entities where cumulative percentage <= threshold
-            mask = grouped_sorted['cumulative_pct'] <= threshold
+            mask = grouped_sorted["cumulative_pct"] <= threshold
             entities_in_threshold = grouped_sorted[mask]
-            
+
             if len(entities_in_threshold) == 0:
                 # If no entities meet the threshold, include at least the first one
                 entities_in_threshold = grouped_sorted.head(1)
-            
+
             concentration[f"top_{threshold}"] = {
                 "count": len(entities_in_threshold),
                 "value": float(entities_in_threshold[value_col].sum()),
-                "percentage": float((entities_in_threshold[value_col].sum() / total_value) * 100),
-                "entities": entities_in_threshold[group_by].tolist()[:10]  # Top 10 for display
+                "percentage": float(
+                    (entities_in_threshold[value_col].sum() / total_value) * 100
+                ),
+                "entities": entities_in_threshold[group_by].tolist()[
+                    :10
+                ],  # Top 10 for display
             }
 
         # Add head sample for display
-        head_sample = grouped_sorted.head(min(20, len(grouped_sorted))).to_dict('records')
+        head_sample = grouped_sorted.head(min(20, len(grouped_sorted))).to_dict(
+            "records"
+        )
         for record in head_sample:
             # Convert numpy types to native Python types for JSON serialization
             for key, value in record.items():
@@ -204,24 +230,28 @@ class ConcentrationAnalyzer:
             "total_entities": len(grouped),
             "total_value": float(total_value),
             "concentration": concentration,
-            "head_sample": head_sample
+            "head_sample": head_sample,
         }
 
-        logs.append({
-            "step": f"concentration_calculation_{period_name}",
-            "status": "completed",
-            "thresholds_calculated": len(thresholds)
-        })
+        logs.append(
+            {
+                "step": f"concentration_calculation_{period_name}",
+                "status": "completed",
+                "thresholds_calculated": len(thresholds),
+            }
+        )
 
         return result, logs
 
-    def _generate_summary(self, results: Dict[str, Any], parameters: Dict[str, Any]) -> Dict[str, Any]:
+    def _generate_summary(
+        self, results: Dict[str, Any], parameters: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Generate summary statistics across all periods."""
         summary = {
             "analysis_type": parameters["analysis_type"],
             "periods_analyzed": len([k for k in results.keys() if k != "summary"]),
             "thresholds": parameters["thresholds"],
-            "total_input_rows": parameters["total_rows"]
+            "total_input_rows": parameters["total_rows"],
         }
 
         # If multi-period, add period-level summary
@@ -229,11 +259,13 @@ class ConcentrationAnalyzer:
             period_summaries = []
             for period, data in results.items():
                 if period not in ["summary", "TOTAL"]:
-                    period_summaries.append({
-                        "period": period,
-                        "entities": data.get("total_entities", 0),
-                        "value": data.get("total_value", 0)
-                    })
+                    period_summaries.append(
+                        {
+                            "period": period,
+                            "entities": data.get("total_entities", 0),
+                            "value": data.get("total_value", 0),
+                        }
+                    )
             summary["periods"] = period_summaries
 
         return summary
@@ -243,12 +275,12 @@ class ConcentrationAnalyzer:
         formulas = {
             "aggregation": "SUM(value_column) GROUP BY group_by_column",
             "sorting": "ORDER BY value DESC, entity ASC (deterministic tie-breaking)",
-            "cumulative_percentage": "(CUMSUM(value) / TOTAL_VALUE) * 100"
+            "cumulative_percentage": "(CUMSUM(value) / TOTAL_VALUE) * 100",
         }
-        
+
         for threshold in thresholds:
             formulas[f"top_{threshold}"] = (
                 f"Count and sum entities where cumulative_percentage <= {threshold}%"
             )
-        
+
         return formulas
