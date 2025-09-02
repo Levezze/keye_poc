@@ -26,6 +26,16 @@ class NormalizationResult:
 class DataNormalizer:
     """Handles data normalization and cleaning."""
     
+    # Precompiled regex patterns for performance
+    _HEADER_SPECIAL_CHARS = re.compile(r'[^\w]')
+    _HEADER_MULTIPLE_UNDERSCORES = re.compile(r'_+')
+    _CURRENCY_SYMBOLS = re.compile(r'[\$€£¥]')
+    _CURRENCY_CODES = re.compile(r'\b(CHF|USD|EUR|GBP|JPY)\b')
+    _THOUSANDS_SEPARATORS = re.compile(r'[\s\u00A0\u202F\']')
+    _DECIMAL_PATTERN = re.compile(r',\d{1,2}$')
+    _PERCENT_HEADER = re.compile(r'(?i)(percent|pct|percentage|%|rate|ratio|margin)')
+    _DATE_HEADER = re.compile(r'(?i)(date|dt|time|timestamp|created|updated|modified)')
+    
     def normalize(self, df: pd.DataFrame) -> NormalizationResult:
         """
         Normalize a DataFrame with deterministic rules.
@@ -96,9 +106,9 @@ class DataNormalizer:
             # Clean: trim, lowercase, replace special chars with underscores
             clean = str(col).strip().lower()
             # Replace spaces and special chars with underscores
-            clean = re.sub(r'[^\w]', '_', clean)
+            clean = self._HEADER_SPECIAL_CHARS.sub('_', clean)
             # Collapse multiple underscores
-            clean = re.sub(r'_+', '_', clean).strip('_')
+            clean = self._HEADER_MULTIPLE_UNDERSCORES.sub('_', clean).strip('_')
             
             # Handle duplicates
             if clean in seen:
@@ -235,15 +245,15 @@ class DataNormalizer:
             if currency_matches:
                 for curr in currency_matches:
                     counters['currencies_detected'].add(curr)
-                val_str = re.sub(r'[\$€£¥]', '', val_str)
+                val_str = self._CURRENCY_SYMBOLS.sub('', val_str)
                 counters['currency_removed'] += 1
             
             # Handle currency codes like CHF, USD, EUR
-            if re.search(r'\b(CHF|USD|EUR|GBP|JPY)\b', val_str):
-                code_match = re.search(r'\b(CHF|USD|EUR|GBP|JPY)\b', val_str)
+            if self._CURRENCY_CODES.search(val_str):
+                code_match = self._CURRENCY_CODES.search(val_str)
                 if code_match:
                     counters['currencies_detected'].add(code_match.group())
-                    val_str = re.sub(r'\b(CHF|USD|EUR|GBP|JPY)\b', '', val_str)
+                    val_str = self._CURRENCY_CODES.sub('', val_str)
                     counters['currency_removed'] += 1
             
             # Handle parentheses for negatives
@@ -273,7 +283,7 @@ class DataNormalizer:
                     break
             
             # Remove spaces (including non-breaking) and apostrophes as thousands separators
-            val_str = re.sub(r'[\s\u00A0\u202F\']', '', val_str)
+            val_str = self._THOUSANDS_SEPARATORS.sub('', val_str)
             
             # Determine decimal convention and parse
             try:
@@ -290,7 +300,7 @@ class DataNormalizer:
                         counters['decimal_conventions_seen'].add('EU')
                 elif ',' in val_str:
                     # Check if comma is decimal (1-2 digits after)
-                    if re.search(r',\d{1,2}$', val_str):
+                    if self._DECIMAL_PATTERN.search(val_str):
                         val_str = val_str.replace(',', '.')
                         counters['decimal_conventions_seen'].add('EU')
                     else:
@@ -336,7 +346,7 @@ class DataNormalizer:
         }
         
         # Check header for percent hint - be more permissive
-        has_pct_header = bool(re.search(r'(?i)(percent|pct|percentage|%|rate|ratio|margin)', col_name))
+        has_pct_header = bool(self._PERCENT_HEADER.search(col_name))
         
         def parse_percent(val):
             if pd.isna(val) or val == '' or str(val).strip() == '':
@@ -387,10 +397,7 @@ class DataNormalizer:
         }
         
         # Check if column name suggests datetime - be more permissive 
-        is_date_column = bool(re.search(
-            r'(?i)(date|dt|time|timestamp|created|updated|modified)', 
-            col_name
-        ))
+        is_date_column = bool(self._DATE_HEADER.search(col_name))
         
         if not is_date_column:
             return series, counters

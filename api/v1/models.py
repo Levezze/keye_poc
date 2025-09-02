@@ -13,6 +13,8 @@ class UploadResponse(BaseModel):
     dataset_id: str
     status: str = Field(description="Processing status")
     message: Optional[str] = None
+    rows_processed: Optional[int] = None
+    columns_processed: Optional[int] = None
 
 
 class ColumnInfo(BaseModel):
