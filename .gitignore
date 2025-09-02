@@ -1,0 +1,88 @@
+# Python
+*.pyc
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+*.cover
+.cache
+nosetests.xml
+coverage.xml
+*.log
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.ruff_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Project specific
+storage/datasets/*
+!storage/datasets/.gitkeep
+*.parquet
+*.xlsx
+*.csv
+!tests/fixtures/*.xlsx
+!tests/fixtures/*.csv
+
+# Temporary files
+*.tmp
+temp/
+.dev/
+docs/instructions/
+
+# Sensitive information
+.env
+.env.local
+config.local.js
+*.key
+*.pem
+
+# OS specific
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Documentation
+site/
+mkdocs.yml
+
+# AI Assistant Guidelines
+CLAUDE.md
