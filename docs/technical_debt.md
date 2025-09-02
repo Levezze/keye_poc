@@ -37,14 +37,32 @@ Purpose: Track intentional deferrals and polish items by branch. Each item lists
 ## feature/time-and-periods
 
 - Debt: No fiscal calendar support
-  - Reason: Out of scope for POC
+  - Reason: Out of scope for POC; calendar vs fiscal distinction documented as limitation
   - Checklist:
     - [ ] Document override hooks for fiscal mapping
+    - [ ] Add fiscal year start month configuration
 
 - Debt: `period_key` head sample not surfaced in API responses
   - Reason: Keep payloads small for POC
   - Checklist:
     - [ ] Consider adding compact head sample for debugging
+
+- Debt: `selected_time_columns` and `derivations` not exposed in API schema
+  - Reason: Internal metadata kept minimal for POC; main use case covered by period_grain/candidates
+  - Checklist:
+    - [ ] Add selected_time_columns to schema response if debugging needs arise
+    - [ ] Document derivation logic for manual override scenarios
+
+- Debt: No manual time column override mechanism  
+  - Reason: POC focuses on automatic detection; precedence rules handle most cases
+  - Checklist:
+    - [ ] Add optional time_column_hints parameter to normalization API
+    - [ ] Allow explicit period_grain selection to override detection
+
+- Debt: Time warnings bundled with general warnings
+  - Reason: Simplified for POC; existing warnings array handles all cases
+  - Checklist:
+    - [ ] Consider separate time_warnings field for better UX categorization
 
 ## feature/concentration-analysis
 

@@ -9,6 +9,7 @@ from typing import Dict, Any, List, Tuple, Optional
 from dataclasses import dataclass
 from datetime import datetime
 from config.settings import settings
+from core.deterministic.time import TimeDetector
 
 
 @dataclass
@@ -62,16 +63,29 @@ class DataNormalizer:
         transformations.extend(type_transformations)
         warnings.extend(type_warnings)
         
-        # 3. Apply domain rules
+        # 3. Detect time dimensions and add period_key
+        time_detector = TimeDetector()
+        time_info = time_detector.detect_time_dimensions(df_normalized)
+        warnings.extend(time_info.get('warnings', []))
+        
+        # Add period_key column for downstream concentration analysis
+        period_key = time_detector.compose_period_key(
+            df_normalized,
+            time_info['period_grain'],
+            time_info['derivations']
+        )
+        df_normalized['period_key'] = period_key
+        
+        # 4. Apply domain rules
         domain_results = self._apply_domain_rules(df_normalized)
         warnings.extend(domain_results['warnings'])
         
-        # 4. Detect anomalies
+        # 5. Detect anomalies
         anomalies = self._detect_anomalies(df_normalized)
         
-        # 5. Generate schema
+        # 6. Generate schema
         schema = self._generate_schema(
-            df_normalized, header_mapping, transformations, warnings, anomalies
+            df_normalized, header_mapping, transformations, warnings, anomalies, time_info
         )
         
         statistics = {
@@ -569,7 +583,7 @@ class DataNormalizer:
     
     def _generate_schema(self, df: pd.DataFrame, header_mapping: Dict[str, str], 
                         transformations: List[Dict[str, Any]], warnings: List[str],
-                        anomalies: Dict[str, Any]) -> Dict[str, Any]:
+                        anomalies: Dict[str, Any], time_info: Dict[str, Any]) -> Dict[str, Any]:
         """Generate comprehensive schema with full metadata."""
         columns_info = []
         
@@ -643,6 +657,9 @@ class DataNormalizer:
             'dataset_id': None,  # Will be set by caller
             'generated_at': datetime.now().isoformat(),
             'columns': columns_info,
+            'period_grain': time_info.get('period_grain', 'none'),
+            'period_grain_candidates': time_info.get('period_grain_candidates', []),
+            'time_candidates': time_info.get('time_candidates', []),
             'metadata': {
                 'row_count': len(df),
                 'column_count': len(df.columns),
