@@ -345,6 +345,157 @@ class TestDataNormalizer:
         # This should remain as string/categorical since coercion failed
         assert failed_info["role"] == "categorical"
 
+    def test_percent_representation_for_decimals_numeric_path(self):
+        """Test that percent-named columns with decimal values get representation='percent' even when numeric coercion runs first."""
+        # Create DataFrame with numeric values in percent-named column
+        df = pd.DataFrame({
+            "margin %": [0.85, 0.12, 0.5, 1.0]  # numeric path succeeds first
+        })
+        
+        result = self.normalizer.normalize(df)
+        
+        # Find the margin column in schema
+        margin_col = next(c for c in result.schema["columns"] if c["name"] == "margin")
+        
+        # Should be marked as percent representation
+        assert margin_col["representation"] == "percent"
+        
+        # Values should NOT be rescaled (0.5 stays 0.5, not 0.005)
+        margin_data = result.data["margin"]
+        assert abs(margin_data.iloc[0] - 0.85) < 0.001
+        assert abs(margin_data.iloc[2] - 0.5) < 0.001  # 0.5 should remain 0.5
+        assert abs(margin_data.iloc[3] - 1.0) < 0.001
+
+    def test_mixed_decimal_conventions_warning_and_flag(self):
+        """Test column with mixed US/EU decimal conventions generates warning and mixed flag."""
+        df = pd.DataFrame({
+            "amount": ["1,234.56", "2.345,67", "3,000", "4.500,00"]  # Mix of US and EU styles
+        })
+        
+        result = self.normalizer.normalize(df)
+        
+        # Find the amount column in schema
+        amount_col = next(c for c in result.schema["columns"] if c["name"] == "amount")
+        
+        # Should be flagged as mixed decimal convention
+        assert amount_col.get("decimal_convention") == "mixed"
+        
+        # Should generate a warning about mixed decimal conventions
+        mixed_warnings = [w for w in result.warnings if "mixed decimal conventions" in w.lower()]
+        assert len(mixed_warnings) > 0
+        assert "amount" in mixed_warnings[0]
+
+    def test_column_level_currency_metadata_and_trailing_symbols(self):
+        """Test currency metadata appears in column schema and trailing symbols work."""
+        df = pd.DataFrame({
+            "revenue": ["$100", "€50", "1,234.50$", "CHF 1,234.50"]  # Multiple currencies, trailing symbol
+        })
+        
+        result = self.normalizer.normalize(df)
+        
+        # Find the revenue column in schema
+        revenue_col = next(c for c in result.schema["columns"] if c["name"] == "revenue")
+        
+        # Should have currency information at column level
+        assert "currencies_detected" in revenue_col
+        assert len(revenue_col["currencies_detected"]) >= 2  # At least $ and €
+        
+        assert "multi_currency" in revenue_col
+        assert revenue_col["multi_currency"] is True
+        
+        # Values should be parsed correctly including trailing symbol
+        revenue_data = result.data["revenue"]
+        assert abs(revenue_data.iloc[0] - 100) < 0.001
+        assert abs(revenue_data.iloc[2] - 1234.50) < 0.001  # Trailing $ should work
+
+    def test_apostrophe_thousands_separator(self):
+        """Test apostrophe as thousands separator (Swiss/French style)."""
+        apostrophe_data = pd.Series(["1'234.50", "1'234'567.89", "5'000"])
+        
+        result, counters = self.normalizer._coerce_numeric(apostrophe_data, "amount")
+        
+        # Should parse correctly
+        assert abs(result.iloc[0] - 1234.50) < 1e-6
+        assert abs(result.iloc[1] - 1234567.89) < 1e-6
+        assert abs(result.iloc[2] - 5000) < 1e-6
+        
+        assert counters['successful_coercions'] == 3
+
+    def test_settings_driven_negative_allowlist(self):
+        """Test that settings.negative_allowed_columns extends the allowlist."""
+        from config.settings import settings
+        
+        # Save original setting
+        original_columns = list(settings.negative_allowed_columns)
+        
+        try:
+            # Temporarily extend allowlist
+            settings.negative_allowed_columns = original_columns + ["discount"]
+            
+            df = pd.DataFrame({
+                "discount_amount": [10, -2, 5],  # Has negatives
+                "revenue": [100, -50, 200]       # Also has negatives (should warn)
+            })
+            
+            domain_result = self.normalizer._apply_domain_rules(df)
+            
+            # Should NOT warn about discount_amount (newly allowed)
+            discount_warnings = [w for w in domain_result["warnings"] if "discount_amount" in w]
+            assert len(discount_warnings) == 0
+            
+            # Should still warn about revenue (not allowed)
+            revenue_warnings = [w for w in domain_result["warnings"] if "revenue" in w]
+            assert len(revenue_warnings) > 0
+            
+        finally:
+            # Restore original setting
+            settings.negative_allowed_columns = original_columns
+
+    def test_role_classification_thresholds(self):
+        """Test role classification based on cardinality thresholds."""
+        # Low cardinality numeric should be classified as categorical
+        df_low_card = pd.DataFrame({
+            "status": [1, 1, 2, 2, 3, 3] * 5  # Only 3 unique values, 30 rows
+        })
+        
+        result_low = self.normalizer.normalize(df_low_card)
+        status_col = next(c for c in result_low.schema["columns"] if c["name"] == "status")
+        assert status_col["role"] == "categorical"  # Low cardinality
+        
+        # High cardinality numeric should stay numeric
+        df_high_card = pd.DataFrame({
+            "transaction_id": list(range(100))  # 100 unique values
+        })
+        
+        result_high = self.normalizer.normalize(df_high_card)
+        tx_col = next(c for c in result_high.schema["columns"] if c["name"] == "transaction_id")
+        assert tx_col["role"] == "numeric"  # High cardinality
+
+    def test_boolean_coercion_threshold_negative_case(self):
+        """Test that columns with <70% boolean-like values are NOT coerced to boolean."""
+        # 10 values: 6 boolean-like (60%), 4 not boolean-like
+        mixed_data = pd.Series(["Yes", "No", "Maybe", "Unknown", "True", "False", "idk", "n/a", "ok", "meh"])
+        
+        result, counters = self.normalizer._coerce_boolean(mixed_data, "flag")
+        
+        # Should NOT be coerced because <70% boolean-like
+        assert counters["boolean_coerced"] == 0
+        assert result.equals(mixed_data)  # Should remain unchanged
+
+    def test_chf_currency_with_nnbsp_separator(self):
+        """Test CHF currency code with non-breaking space thousands separator."""
+        # Using unicode NNBSP (\u202F) as thousands separator
+        chf_data = pd.Series([f"CHF 1{chr(0x202F)}234.50", f"CHF 2{chr(0x202F)}500{chr(0x202F)}000.00"])
+        
+        result, counters = self.normalizer._coerce_numeric(chf_data, "amount")
+        
+        # Should parse correctly
+        assert abs(result.iloc[0] - 1234.50) < 1e-6
+        assert abs(result.iloc[1] - 2500000.00) < 1e-6
+        
+        assert counters['successful_coercions'] == 2
+        assert "CHF" in counters['currencies_detected']
+
 
 class TestIntegrationWithSampleData:
     """Integration tests with actual sample data files."""

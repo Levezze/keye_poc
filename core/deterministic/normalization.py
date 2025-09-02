@@ -126,6 +126,12 @@ class DataNormalizer:
             numeric_result, numeric_counters = self._coerce_numeric(df[col], col)
             if numeric_counters['successful_coercions'] > 0:
                 df[col] = numeric_result
+                
+                # Check for percent representation even after successful numeric coercion
+                _, percent_counters = self._normalize_percentages(df[col], col)
+                if percent_counters.get('representation') == 'percent':
+                    numeric_counters['representation'] = 'percent'
+                
                 transformations.append({
                     "step": "numeric_coercion",
                     "column": col,
@@ -149,6 +155,16 @@ class DataNormalizer:
                     "column": col,
                     "original_dtype": original_dtype,
                     "new_dtype": "float64",
+                    "counters": percent_counters
+                })
+                continue
+            elif percent_counters.get('representation') == 'percent':
+                # Even if no normalization occurred, record percent representation
+                transformations.append({
+                    "step": "percent_representation", 
+                    "column": col,
+                    "original_dtype": original_dtype,
+                    "new_dtype": original_dtype,
                     "counters": percent_counters
                 })
                 continue
@@ -192,7 +208,8 @@ class DataNormalizer:
             'decimal_convention': None,
             'decimal_conventions_seen': set(),
             'currencies_detected': set(),
-            'multi_currency': False
+            'multi_currency': False,
+            'representation': None
         }
         
         def parse_value(val):
@@ -255,8 +272,8 @@ class DataNormalizer:
                     counters['scaling_applied'] += 1
                     break
             
-            # Remove spaces (including non-breaking)
-            val_str = re.sub(r'[\s\u00A0\u202F]', '', val_str)
+            # Remove spaces (including non-breaking) and apostrophes as thousands separators
+            val_str = re.sub(r'[\s\u00A0\u202F\']', '', val_str)
             
             # Determine decimal convention and parse
             try:
