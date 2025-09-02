@@ -1,0 +1,105 @@
+"""
+Test configuration and fixtures for Keye POC tests.
+"""
+import pytest
+import pandas as pd
+import tempfile
+import shutil
+from pathlib import Path
+from unittest.mock import patch
+from typing import Dict, Any, Generator
+import os
+
+@pytest.fixture
+def temp_dir() -> Generator[Path, None, None]:
+    """Create a temporary directory for tests."""
+    temp_path = Path(tempfile.mkdtemp())
+    try:
+        yield temp_path
+    finally:
+        shutil.rmtree(temp_path, ignore_errors=True)
+
+@pytest.fixture
+def mock_datasets_path(temp_dir: Path) -> Generator[Path, None, None]:
+    """Mock the datasets path setting."""
+    datasets_path = temp_dir / "datasets"
+    datasets_path.mkdir(parents=True, exist_ok=True)
+    
+    with patch("services.registry.settings.datasets_path", datasets_path):
+        yield datasets_path
+
+@pytest.fixture
+def sample_df() -> pd.DataFrame:
+    """Create a sample DataFrame for testing."""
+    return pd.DataFrame({
+        "Company": ["ACME Corp", "Beta Inc", "Gamma LLC", "Delta Co"],
+        "Revenue": [1000000, 750000, 500000, 250000],
+        "Year": [2023, 2023, 2023, 2023],
+        "Quarter": ["Q1", "Q2", "Q3", "Q4"]
+    })
+
+@pytest.fixture
+def sample_time_series_df() -> pd.DataFrame:
+    """Create a sample time series DataFrame for testing."""
+    return pd.DataFrame({
+        "Company": ["ACME Corp"] * 4 + ["Beta Inc"] * 4,
+        "Revenue": [1000, 1100, 1200, 1300, 500, 550, 600, 650],
+        "Date": pd.date_range("2023-01-01", periods=8, freq="Q").tolist()
+    })
+
+@pytest.fixture
+def sample_concentration_results() -> Dict[str, Any]:
+    """Create sample concentration analysis results."""
+    return {
+        "group_by": "Company",
+        "value_column": "Revenue", 
+        "time_column": "Date",
+        "thresholds": [10, 20, 50],
+        "by_period": [
+            {
+                "period": "2023-Q1",
+                "total": 2500000,
+                "top_10": {"count": 1, "value": 1000000, "pct_of_total": 40.0},
+                "top_20": {"count": 2, "value": 1750000, "pct_of_total": 70.0},
+                "top_50": {"count": 4, "value": 2500000, "pct_of_total": 100.0}
+            },
+            {
+                "period": "2023-Q2", 
+                "total": 2000000,
+                "top_10": {"count": 1, "value": 800000, "pct_of_total": 40.0},
+                "top_20": {"count": 2, "value": 1400000, "pct_of_total": 70.0},
+                "top_50": {"count": 3, "value": 2000000, "pct_of_total": 100.0}
+            }
+        ],
+        "details": [
+            {"Company": "ACME Corp", "Total_Revenue": 1800000, "Rank": 1},
+            {"Company": "Beta Inc", "Total_Revenue": 1200000, "Rank": 2}
+        ]
+    }
+
+@pytest.fixture
+def sample_schema() -> Dict[str, Any]:
+    """Create a sample schema for testing."""
+    return {
+        "version": "1.0",
+        "columns": [
+            {"name": "Company", "type": "string", "nullable": False},
+            {"name": "Revenue", "type": "integer", "nullable": False},
+            {"name": "Year", "type": "integer", "nullable": False},
+            {"name": "Quarter", "type": "string", "nullable": False}
+        ],
+        "primary_key": ["Company", "Year", "Quarter"],
+        "description": "Sample financial data"
+    }
+
+@pytest.fixture
+def sample_lineage_step() -> Dict[str, Any]:
+    """Create sample lineage step data."""
+    return {
+        "operation": "normalization",
+        "inputs": ["raw/upload.xlsx"],
+        "outputs": ["normalized.parquet"],
+        "params": {"drop_duplicates": True, "fillna_method": "forward"},
+        "metrics": {"rows_processed": 1000, "duplicates_removed": 5},
+        "llm_info": {"model": "gpt-4", "tokens_used": 150}
+    }
