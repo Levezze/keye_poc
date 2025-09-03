@@ -8,6 +8,22 @@ This document tracks technical debt items organized by priority and branch. Each
 
 *No high priority technical debt items currently identified*
 
+### Low Priority
+
+#### API Versioning Strategy
+**Background:** Recent enhancements to threshold handling (1-100% range, automatic sorting) and performance optimizations suggest future API evolution needs.
+
+**Current State:**
+- All endpoints under `/api/v1/` with backward compatibility maintained
+- Dynamic threshold validation and sorting implemented
+- Performance warnings for large datasets (>10k entities)
+- Optional timing metrics via configuration
+
+**Recommendation:**
+- Document API versioning strategy (semver vs date-based)
+- Consider v1.1 announcement for enhanced threshold features
+- Plan deprecation timeline for any breaking changes
+
 ### Medium Priority
 
 #### CSV Metadata Export Format

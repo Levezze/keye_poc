@@ -8,8 +8,7 @@ A proof-of-concept data analysis pipeline that ingests Excel/CSV files, performs
 - **Automatic Schema Detection**: Intelligent type inference with LLM enhancement
 - **Data Normalization**: Generic and domain-specific cleaning rules
 - **Time Dimension Handling**: Composite time periods (year/month/quarter)
-- **Concentration Analysis**: Top 10/20/50% analysis with configurable thresholds
- - **Concentration Analysis**: Deterministic analysis with configurable thresholds (any 1–99)
+- **Concentration Analysis**: Deterministic analysis with configurable thresholds (1-100%)
 - **AI Insights**: LLM-generated business insights and recommendations
 - **Full Auditability**: Complete lineage tracking and reproducible results
 - **Multiple Export Formats**: JSON, CSV, and Excel outputs
@@ -82,7 +81,7 @@ curl -X POST "http://localhost:8000/api/v1/analyze/ds_abc123/concentration" \
   -d '{
     "group_by": "customer",
     "value": "revenue",
-    "thresholds": [10, 20, 50]
+    "thresholds": [5, 15, 50, 100]
   }'
 
 # Get insights

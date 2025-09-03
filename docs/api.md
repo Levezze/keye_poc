@@ -21,9 +21,14 @@ ConcentrationRequest
 {
   "group_by": "string",
   "value": "string",
-  "thresholds": [10, 20, 50]
+  "thresholds": [10, 20, 50, 100]
 }
 ```
+
+- `thresholds`: Array of concentration percentages (1-100). Values are automatically sorted and deduplicated.
+- Default: `[10, 20, 50]`
+- Maximum: 10 thresholds per request
+- Range: 1% to 100% inclusive
 
 ConcentrationResponse (shape excerpt)
 ```json

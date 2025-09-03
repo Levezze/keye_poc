@@ -9,7 +9,7 @@ The concentration analysis feature analyzes how value is distributed across enti
 **Key Concepts:**
 - **Entity**: The dimension to group by (e.g., customers, products, regions)
 - **Value**: The metric to analyze (e.g., revenue, sales, units)
-- **Thresholds**: Percentage cutoffs (e.g., [10, 20, 50] for top 10%, 20%, 50%)
+- **Thresholds**: Percentage cutoffs (e.g., [10, 20, 50, 100] for top 10%, 20%, 50%, 100%). Range: 1-100%, automatically sorted.
 - **Periods**: Optional time-based grouping for temporal analysis
 
 ## Complete Workflow
@@ -248,6 +248,16 @@ Threshold 90%: CustomerA + CustomerB (83.3% ≤ 90%)
 }
 ```
 **Insight:** "Top 20% of regions generate 70% of sales"
+
+### 4. Complete Market Analysis
+```json
+{
+  "group_by": "customer_name",
+  "value": "revenue", 
+  "thresholds": [10, 25, 50, 100]
+}
+```
+**Insight:** "Top 10% customers = 45% revenue, 100% threshold shows total customer base of 1,247"
 
 ## Export Formats
 
