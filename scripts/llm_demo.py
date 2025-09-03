@@ -102,7 +102,7 @@ class LLMDemoRunner:
         self.registry = DatasetRegistry()
         self.request_id = f"demo_{uuid.uuid4().hex[:8]}"
 
-        print(f" LLM Demo Starting")
+        print("LLM Demo Starting")
         print(f" Demo Dataset ID: {self.demo_dataset_id}")
         print(f" Request ID: {self.request_id}")
         print(f" LLM Enabled: {settings.use_llm}")
@@ -263,7 +263,7 @@ class LLMDemoRunner:
 
         success_count = 0
         for question in questions:
-            print(f"\n❓ Question: {question}")
+            print(f"\nQuestion: {question}")
             try:
                 result, status = await llm_executor.answer_question(
                     dataset_id=self.demo_dataset_id,
@@ -273,7 +273,7 @@ class LLMDemoRunner:
                 )
 
                 print(f"   Answer: {result.answer}")
-                print(f"   Status: {'✅ Success' if status.used else '❌ Fallback'}")
+                print(f"   Status: {'Success' if status.used else 'Fallback'}")
                 if result.citations:
                     print(f"   Citations: {result.citations}")
 
@@ -301,14 +301,16 @@ class LLMDemoRunner:
                 request_id=self.request_id,
             )
 
-            print(f"📊 Full Insights Generated:")
+            print("Full Insights Generated:")
             print(f"   Overall Status: {result['overall_llm_status']}")
             print(f"   Generated At: {result['generated_at']}")
 
             for insight_type, insight_data in result.items():
                 if isinstance(insight_data, dict) and "llm_status" in insight_data:
                     status = insight_data["llm_status"]
-                    print(f"   {insight_type}: {'✅' if status.get('used') else '❌'}")
+                    print(
+                        f"   {insight_type}: {'Used' if status.get('used') else 'Skipped'}"
+                    )
 
             return True
 
@@ -342,7 +344,7 @@ class LLMDemoRunner:
             # Check if dataset exists in registry
             lineage = self.registry.get_lineage(self.demo_dataset_id)
             if lineage:
-                print(f"📝 Lineage found for dataset {self.demo_dataset_id}")
+                print(f"Lineage found for dataset {self.demo_dataset_id}")
                 llm_steps = [
                     step for step in lineage.get("steps", []) if step.get("llm")
                 ]
@@ -371,7 +373,7 @@ class LLMDemoRunner:
 
         try:
             schemas = export_schemas()
-            print(f"📋 Available LLM Function Schemas:")
+            print("Available LLM Function Schemas:")
             for name, schema in schemas.items():
                 print(f"   - {name}: {len(schema.get('properties', {}))} properties")
 
@@ -379,7 +381,7 @@ class LLMDemoRunner:
             if schemas:
                 example_name = list(schemas.keys())[0]
                 example_schema = schemas[example_name]
-                print(f"\n📝 Example Schema ({example_name}):")
+                print(f"\nExample Schema ({example_name}):")
                 print(json.dumps(example_schema, indent=2)[:300] + "...")
 
         except Exception as e:
@@ -387,13 +389,13 @@ class LLMDemoRunner:
 
     async def run_comprehensive_demo(self):
         """Run the complete demonstration."""
-        print("🎯 Starting Comprehensive LLM Demonstration")
+        print("Starting Comprehensive LLM Demonstration")
 
         # Create demo dataset for tracking
         try:
             self.registry.create_dataset(f"llm_demo_{self.request_id}.json")
         except Exception as e:
-            print(f"⚠️  Could not create demo dataset: {e}")
+            print(f"Warning: Could not create demo dataset: {e}")
 
         # Run all demos
         demos = [
@@ -412,7 +414,7 @@ class LLMDemoRunner:
                 success = await demo_func()
                 results[name] = success
             except Exception as e:
-                print(f"❌ {name} demo failed completely: {e}")
+                print(f"{name} demo failed completely: {e}")
                 results[name] = False
 
         # Run sync demos
@@ -425,19 +427,19 @@ class LLMDemoRunner:
         successful = sum(results.values())
         total = len(results)
 
-        print(f"📊 Demo Results: {successful}/{total} successful")
+        print(f"Demo Results: {successful}/{total} successful")
         for name, success in results.items():
-            status = "✅" if success else "❌"
+            status = "OK" if success else "FAIL"
             print(f"   {status} {name}")
 
         if successful == total:
-            print("\n🎉 All demos completed successfully!")
+            print("\nAll demos completed successfully!")
         elif successful > 0:
-            print(f"\n⚠️  {total - successful} demos failed - check LLM configuration")
+            print(f"\n{total - successful} demos failed - check LLM configuration")
         else:
-            print("\n❌ All demos failed - LLM may be disabled or misconfigured")
+            print("\nAll demos failed - LLM may be disabled or misconfigured")
 
-        print(f"\n💡 Tips:")
+        print("\nTips:")
         print(f"   - Set environment variables for your LLM provider")
         print(f"   - Check USE_LLM=true in .env")
         print(f"   - Verify API keys are valid")
@@ -466,9 +468,9 @@ def main():
     try:
         asyncio.run(runner.run_comprehensive_demo())
     except KeyboardInterrupt:
-        print("\n⚠️  Demo interrupted by user")
+        print("\nDemo interrupted by user")
     except Exception as e:
-        print(f"\n❌ Demo failed: {e}")
+        print(f"\nDemo failed: {e}")
         sys.exit(1)
 
 

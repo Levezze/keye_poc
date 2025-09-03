@@ -100,7 +100,7 @@ Answers user questions based on available analysis data.
 LLM_PROVIDER=openai          # openai | anthropic | gemini
 LLM_MODEL=gpt-4.1-mini      # Model name (friendly mapping applied)
 
-# API Keys
+# API Keys (set only the one you will use)
 OPENAI_API_KEY=sk-...
 ANTHROPIC_API_KEY=sk-ant-...
 GOOGLE_API_KEY=AIza...
@@ -330,15 +330,24 @@ storage/datasets/{dataset_id}/llm/
 Run comprehensive demonstrations:
 
 ```bash
-# Full demo
-python scripts/llm_demo.py
+# Offline (read-only): uses committed mock_data; prints results; never writes
+python scripts/offline_llm_demo.py
 
-# Schema export only
-python scripts/llm_demo.py --schemas-only
+# Offline (refresh artifacts if keys succeed)
+python scripts/offline_llm_demo.py --refresh-artifacts
+
+# Live (print-only): uses your .env and a real dataset id; never writes
+python scripts/live_llm_demo.py --dataset-id ds_...
 
 # Help
-python scripts/llm_demo.py --help
+python scripts/offline_llm_demo.py --help
+python scripts/live_llm_demo.py --help
 ```
+
+### Mock Dataset
+- A tiny, committed mock dataset is available at `storage/datasets/mock_data/`.
+- It contains deterministic artifacts (schema.json, analyses/concentration.json|.csv|.xlsx) and sample LLM artifacts.
+- Use the offline demo to showcase the full experience without requiring API keys.
 
 ## Error Handling
 

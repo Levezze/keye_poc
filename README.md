@@ -106,6 +106,18 @@ curl "http://localhost:8000/api/v1/download/ds_abc123/concentration.xlsx" \
 # Check API health
 curl "http://localhost:8000/healthz"
 
+### Demos
+
+```bash
+# Offline (read-only) demo over committed mock dataset
+python scripts/offline_llm_demo.py
+
+# Live (print-only) demo over a real dataset id
+python scripts/live_llm_demo.py --dataset-id ds_...
+```
+
+Mock dataset lives at `storage/datasets/mock_data/` and contains tiny deterministic outputs (and sample LLM artifacts) for showcase purposes.
+
 ## Operational Notes
 
 - Rate limiting is enforced per IP and path at 60 requests/minute. The `/healthz` endpoint is optimized to avoid lingering throttles during readiness bursts. See `docs/decisions/0005_rate-limiting-keying-and-testability.md`.
