@@ -340,6 +340,11 @@ uv pip install -r requirements.txt
 - Run unit tests only: `uv run pytest tests/unit/`
 - Use pytest-xdist for parallel execution
 
+### Testing Notes (Rate Limiting)
+- The rate limiter enforces 60 requests/minute per IP and path. This design reduces cross-endpoint interference during tests.
+- The `/healthz` endpoint uses a shorter internal decay window to avoid lingering throttling during readiness bursts, ensuring stable CI runs.
+- For background and rationale, see `docs/decisions/0005_rate-limiting-keying-and-testability.md`.
+
 #### Coverage gaps
 ```bash
 # Find uncovered lines

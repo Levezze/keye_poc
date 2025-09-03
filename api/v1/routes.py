@@ -93,7 +93,7 @@ async def upload_dataset(
 
         try:
             # Load data
-            if ext in [".xlsx", ".xls"]:
+            if ext in [".xlsx"]:
                 if sheet is None:
                     # If no sheet specified, read the first sheet
                     df = pd.read_excel(tmp_file_path, sheet_name=0)
@@ -187,9 +187,7 @@ async def get_schema(dataset_id: str, x_api_key: Optional[str] = Header(default=
             state = registry.get_dataset_state(dataset_id)
         except DatasetNotFoundError as e:
             # Correct behavior: 404 when dataset does not exist
-            raise HTTPException(
-                status_code=404, detail=str(e)
-            )
+            raise HTTPException(status_code=404, detail=str(e))
         if not state["exists"]:
             raise HTTPException(
                 status_code=404, detail=f"Dataset {dataset_id} not found"
@@ -320,7 +318,7 @@ async def analyze_concentration(
                 "head_sample": period_data.get("head_sample", []),
             }
             export_data["by_period"].append(period_export)
-            
+
             # Add head sample to details (limit to 10 items per period)
             head_sample = period_data.get("head_sample", [])[:10]
             for item in head_sample:
@@ -336,39 +334,43 @@ async def analyze_concentration(
                 "concentration": totals_data.get("concentration", {}),
                 "head_sample": totals_data.get("head_sample", []),
             }
-        
+
         # Add export metadata
-        export_data.update({
-            "group_by": request.group_by,
-            "value_column": request.value,
-            "time_column": period_key_column or "none",
-            "thresholds": request.thresholds or [10, 20, 50],
-        })
+        export_data.update(
+            {
+                "group_by": request.group_by,
+                "value_column": request.value,
+                "time_column": period_key_column or "none",
+                "thresholds": request.thresholds or [10, 20, 50],
+            }
+        )
 
         # Generate exports with error handling
         analyses_path = dataset_path / "analyses"
         export_paths = {}
-        
+
         try:
             # Build all export data in memory first, then write files
             csv_path = exporter.export_concentration_csv(
                 export_data, analyses_path / "concentration.csv"
             )
             export_paths["csv"] = csv_path
-            
+
             excel_path = exporter.export_concentration_excel(
                 export_data, analyses_path / "concentration.xlsx"
             )
             export_paths["xlsx"] = excel_path
-            
+
         except Exception as export_error:
             # Log export failure but don't fail the entire analysis
-            analysis_result.computation_log.append({
-                "step": "export_generation",
-                "status": "failed", 
-                "error": str(export_error),
-                "export_formats_attempted": ["csv", "xlsx"]
-            })
+            analysis_result.computation_log.append(
+                {
+                    "step": "export_generation",
+                    "status": "failed",
+                    "error": str(export_error),
+                    "export_formats_attempted": ["csv", "xlsx"],
+                }
+            )
             # Continue without export files
             export_paths = {}
 
@@ -413,12 +415,14 @@ async def analyze_concentration(
 
             # Get head sample (limit to 10 items for API payload size)
             head_sample = period_data.get("head_sample", [])[:10]
-            
+
             # Build dynamic concentration metrics from analyzer results
             concentration_metrics = {}
             for threshold_key, metric_data in concentration.items():
-                concentration_metrics[threshold_key] = convert_concentration_metric(metric_data)
-            
+                concentration_metrics[threshold_key] = convert_concentration_metric(
+                    metric_data
+                )
+
             period_result = {
                 "period": period_key,
                 "total": period_data.get("total_value", 0),
@@ -449,10 +453,14 @@ async def analyze_concentration(
             thresholds=request.thresholds or [10, 20, 50],
             by_period=by_period,
             totals=totals,
-            export_links={
-                format_type: f"/api/v1/download/{dataset_id}/concentration.{format_type}"
-                for format_type in export_paths.keys()
-            } if export_paths else None,
+            export_links=(
+                {
+                    format_type: f"/api/v1/download/{dataset_id}/concentration.{format_type}"
+                    for format_type in export_paths.keys()
+                }
+                if export_paths
+                else None
+            ),
         )
 
     except HTTPException:
@@ -500,7 +508,7 @@ async def download_concentration_csv(
 
         # Read CSV content so we can append dimension metadata for POC UX
         # TODO: TECH DEBT - Replace post-append metadata with proper CSV structure
-        # Current: Appends "GroupBy,{value}" line after CSV data  
+        # Current: Appends "GroupBy,{value}" line after CSV data
         # Better: Add metadata as proper CSV columns or separate metadata.csv file
         # Tracked in: docs/tech_debt.md
         try:
@@ -697,27 +705,25 @@ async def get_lineage(dataset_id: str, x_api_key: Optional[str] = Header(default
     """
     _require_api_key(x_api_key)
     _validate_dataset_id(dataset_id)
-    
+
     registry = DatasetRegistry()
-    
+
     try:
         # Check if dataset exists
         try:
             state = registry.get_dataset_state(dataset_id)
         except DatasetNotFoundError as e:
-            raise HTTPException(
-                status_code=404, detail=str(e)
-            )
-        
+            raise HTTPException(status_code=404, detail=str(e))
+
         # Get lineage data
         lineage_data = registry.get_lineage(dataset_id)
         if not lineage_data:
             raise HTTPException(
                 status_code=404, detail=f"Lineage not found for dataset {dataset_id}"
             )
-        
+
         return lineage_data
-        
+
     except HTTPException:
         raise
     except Exception as e:

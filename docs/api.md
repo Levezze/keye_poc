@@ -1,5 +1,10 @@
 ## API v1 Overview
 
+### Operational Notes
+- Headers: Support `X-Request-ID` for end-to-end request tracing; echoed back in responses and included in error envelopes.
+- Rate limiting: 60 requests/minute per IP and path; `/healthz` tuned for readiness bursts. 429 responses include `Retry-After` and the request ID.
+- Health endpoints: `GET /health` (basic liveness), `GET /healthz` (enhanced dependency checks; returns 503 JSON when unhealthy).
+
 ### Authentication
 - Optional API key via header: `X-API-Key: <key>`
 - All requests support `X-Request-ID` header for tracking
@@ -18,8 +23,10 @@
 | GET | /healthz | Enhanced health check |
 
 ### Rate Limiting
-- 60 requests per minute per IP address
+- 60 requests per minute per IP and path
+- `/healthz` uses a shorter decay window internally to avoid interfering with readiness checks during bursts
 - Returns 429 status with `Retry-After` header when exceeded
+- See ADR 0005 for rationale and details
 
 ### Error Response Format
 All errors return a standardized JSON structure:
@@ -36,6 +43,14 @@ All errors return a standardized JSON structure:
 ```
 
 Error types: `ValidationError`, `NotFound`, `Conflict`, `RateLimited`, `PayloadTooLarge`, `InternalError`, `Unauthorized`
+
+Notes:
+- Error envelopes are JSON-safe; validation errors are serialized with JSON-compatible fields. The implementation uses `jsonable_encoder` to ensure no raw exceptions leak into the JSON body.
+
+### File Types and Limits
+- Accepted file types: CSV (`text/csv`) and XLSX (`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`)
+- Legacy `.xls` files are not accepted
+- Max upload size: 25MB (uploads exceeding this return 413 with `PayloadTooLarge`)
 
 ### Models
 

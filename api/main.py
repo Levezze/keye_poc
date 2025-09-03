@@ -4,6 +4,8 @@ Keye POC API - Main FastAPI Application
 
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
 from config.settings import settings
@@ -53,6 +55,7 @@ app.add_middleware(RequestTrackingMiddleware)
 # Add exception handlers
 app.add_exception_handler(HTTPException, http_exception_handler)
 app.add_exception_handler(ValidationError, validation_exception_handler)
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.add_exception_handler(Exception, general_exception_handler)
 
 # Mount API v1
@@ -71,22 +74,20 @@ async def health_check_enhanced():
     """Enhanced health check endpoint that validates dependencies."""
     from pathlib import Path
     import os
-    
-    health_status = {
-        "status": "healthy",
-        "service": "keye-poc-api",
-        "checks": {}
-    }
-    
+
+    health_status = {"status": "healthy", "service": "keye-poc-api", "checks": {}}
+
     try:
         # Check storage directory exists and is writable
         storage_path = settings.datasets_path
         health_status["checks"]["storage_directory"] = {
             "status": "healthy" if storage_path.exists() else "unhealthy",
             "path": str(storage_path),
-            "writable": os.access(storage_path, os.W_OK) if storage_path.exists() else False
+            "writable": (
+                os.access(storage_path, os.W_OK) if storage_path.exists() else False
+            ),
         }
-        
+
         # Check if we can create directories
         test_dir = storage_path / "health_check"
         try:
@@ -95,25 +96,25 @@ async def health_check_enhanced():
             health_status["checks"]["directory_creation"] = {"status": "healthy"}
         except Exception as e:
             health_status["checks"]["directory_creation"] = {
-                "status": "unhealthy", 
-                "error": str(e)
+                "status": "unhealthy",
+                "error": str(e),
             }
-        
+
         # Overall status
         all_healthy = all(
-            check.get("status") == "healthy" 
+            check.get("status") == "healthy"
             for check in health_status["checks"].values()
         )
-        
+
         if not all_healthy:
             health_status["status"] = "unhealthy"
-            return health_status, 503
-            
+            return JSONResponse(status_code=503, content=health_status)
+
     except Exception as e:
         health_status["status"] = "unhealthy"
         health_status["error"] = str(e)
-        return health_status, 503
-    
+        return JSONResponse(status_code=503, content=health_status)
+
     return health_status
 
 

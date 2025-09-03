@@ -46,6 +46,7 @@ Once running, visit:
 - Interactive API docs: http://localhost:8000/docs
 - Alternative API docs: http://localhost:8000/redoc
 - Health check: http://localhost:8000/health
+ - Enhanced health check: http://localhost:8000/healthz
 
 ## API Endpoints
 
@@ -104,6 +105,12 @@ curl "http://localhost:8000/api/v1/download/ds_abc123/concentration.xlsx" \
 
 # Check API health
 curl "http://localhost:8000/healthz"
+
+## Operational Notes
+
+- Rate limiting is enforced per IP and path at 60 requests/minute. The `/healthz` endpoint is optimized to avoid lingering throttles during readiness bursts. See `docs/decisions/0005_rate-limiting-keying-and-testability.md`.
+- Error responses are standardized and JSON-safe. Validation errors use JSON-compatible fields.
+- Accepted uploads: CSV and `.xlsx` (Excel OpenXML). Legacy `.xls` is not accepted.
 ```
 
 ## Architecture
