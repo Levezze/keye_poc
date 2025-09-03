@@ -4,7 +4,7 @@ Handles exporting analysis results to various formats.
 """
 
 import pandas as pd
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 from pathlib import Path
 import json
 from services.storage import StorageService
@@ -34,7 +34,10 @@ class ExportService:
             concentration = payload.get("concentration")
             if isinstance(concentration, dict) and concentration:
                 # Sort thresholds by numeric value for deterministic order
-                sorted_keys = sorted(concentration.keys(), key=lambda x: int(x.split('_')[1]) if '_' in x else 0)
+                sorted_keys = sorted(
+                    concentration.keys(),
+                    key=lambda x: int(x.split("_")[1]) if "_" in x else 0,
+                )
                 for threshold_key in sorted_keys:
                     metrics = concentration[threshold_key]
                     if isinstance(metrics, dict):
@@ -123,7 +126,10 @@ class ExportService:
                 concentration = period_data.get("concentration")
                 if isinstance(concentration, dict) and concentration:
                     # Sort thresholds by numeric value for deterministic column order
-                    sorted_keys = sorted(concentration.keys(), key=lambda x: int(x.split('_')[1]) if '_' in x else 0)
+                    sorted_keys = sorted(
+                        concentration.keys(),
+                        key=lambda x: int(x.split("_")[1]) if "_" in x else 0,
+                    )
                     for threshold_key in sorted_keys:
                         metrics = concentration[threshold_key]
                         if isinstance(metrics, dict):
@@ -155,7 +161,10 @@ class ExportService:
             concentration = totals_data.get("concentration", {})
             if isinstance(concentration, dict) and concentration:
                 # Sort thresholds by numeric value for deterministic column order
-                sorted_keys = sorted(concentration.keys(), key=lambda x: int(x.split('_')[1]) if '_' in x else 0)
+                sorted_keys = sorted(
+                    concentration.keys(),
+                    key=lambda x: int(x.split("_")[1]) if "_" in x else 0,
+                )
                 for threshold_key in sorted_keys:
                     metrics = concentration[threshold_key]
                     if isinstance(metrics, dict):

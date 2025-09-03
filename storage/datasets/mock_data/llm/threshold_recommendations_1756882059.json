@@ -1,0 +1,35 @@
+{
+  "function_name": "threshold_recommendations",
+  "request_id": "offline-demo",
+  "dataset_id": "mock_data",
+  "timestamp": "2025-09-03T06:47:40.677604+00:00",
+  "model": "gpt-4o-mini",
+  "provider": "openai",
+  "context_hash": "8e166bc4c05fd6da",
+  "response": {
+    "suggested": [
+      10,
+      20,
+      50
+    ],
+    "rationale": "The data shows high concentration with top entities dominating revenue, suggesting thresholds of 10% and 20% for monitoring risk, while 50% aligns with industry standards for significant concentration."
+  },
+  "latency_ms": 1541,
+  "usage": {
+    "completion_tokens": 59,
+    "prompt_tokens": 530,
+    "total_tokens": 589,
+    "completion_tokens_details": {
+      "accepted_prediction_tokens": 0,
+      "audio_tokens": 0,
+      "reasoning_tokens": 0,
+      "rejected_prediction_tokens": 0
+    },
+    "prompt_tokens_details": {
+      "audio_tokens": 0,
+      "cached_tokens": 0
+    }
+  },
+  "cached": false,
+  "error": null
+}

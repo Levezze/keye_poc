@@ -4,12 +4,12 @@ API v1 Routes
 
 from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks, Header
 from fastapi.responses import FileResponse
-from typing import Optional, List
+from typing import Optional, List, Any
 import pandas as pd
 import tempfile
 import os
 import json
-from pathlib import Path
+import time
 import re
 
 from config.settings import settings
@@ -19,6 +19,8 @@ from api.v1.models import (
     ConcentrationResponse,
     SchemaResponse,
     InsightsResponse,
+    LLMAnalysisRequest,
+    LLMAnalysisResponse,
 )
 from services.registry import DatasetRegistry
 from services.storage import StorageService
@@ -26,7 +28,8 @@ from services.normalization_service import NormalizationService
 from core.deterministic.time import TimeDetector
 from core.deterministic.concentration import ConcentrationAnalyzer
 from services.exporters import ExportService
-from services.exceptions import DatasetNotFoundError, SchemaNotFoundError
+from services.exceptions import DatasetNotFoundError
+from core.llm.executors import llm_executor
 
 router = APIRouter()
 
@@ -42,6 +45,83 @@ _DATASET_ID_PATTERN = re.compile(r"^ds_[a-f0-9]{12}$")
 def _validate_dataset_id(dataset_id: str) -> None:
     if not _DATASET_ID_PATTERN.match(dataset_id or ""):
         raise HTTPException(status_code=400, detail="Invalid dataset ID format")
+
+
+async def _run_llm_analysis_background(
+    dataset_id: str,
+    concentration_results: dict[str, Any],
+    schema: dict[str, Any],
+    thresholds: List[int],
+    registry: DatasetRegistry,
+):
+    """
+    Background task to run LLM analysis after concentration analysis completes.
+    This runs asynchronously so the user gets their concentration results immediately.
+    """
+    try:
+        # Execute all available LLM functions
+        functions = ["narrative_insights", "risk_flags", "threshold_recommendations"]
+        executed_functions = []
+        artifacts_created = []
+
+        for function_name in functions:
+            try:
+                if function_name == "narrative_insights":
+                    result, status = await llm_executor.generate_narrative_insights(
+                        dataset_id,
+                        concentration_results,
+                        schema,
+                        thresholds,
+                        request_id="auto-concentration",
+                    )
+                elif function_name == "risk_flags":
+                    result, status = await llm_executor.generate_risk_flags(
+                        dataset_id,
+                        concentration_results,
+                        request_id="auto-concentration",
+                    )
+                elif function_name == "threshold_recommendations":
+                    result, status = (
+                        await llm_executor.generate_threshold_recommendations(
+                            dataset_id,
+                            concentration_results,
+                            thresholds,
+                            request_id="auto-concentration",
+                        )
+                    )
+
+                if status.used:
+                    executed_functions.append(function_name)
+                    # Find created artifacts
+                    dataset_path = settings.datasets_path / dataset_id
+                    llm_dir = dataset_path / "llm"
+                    new_artifacts = list(llm_dir.glob(f"{function_name}_*.json"))
+                    if new_artifacts:
+                        artifacts_created.extend([f.name for f in new_artifacts])
+
+            except Exception as e:
+                # Log but don't fail the entire background task
+                print(f"Background LLM function {function_name} failed: {str(e)}")
+
+        # Update lineage if any functions executed
+        if executed_functions:
+            registry.append_lineage_step(
+                dataset_id,
+                operation="background_llm_analysis",
+                inputs=["schema.json", "analyses/concentration.json"],
+                outputs=[f"llm/{artifact}" for artifact in artifacts_created],
+                params={
+                    "functions": executed_functions,
+                    "triggered_by": "concentration_analysis",
+                    "provider": settings.llm_provider,
+                    "model": settings.llm_model,
+                },
+                metrics={"functions_executed": len(executed_functions)},
+            )
+
+    except Exception as e:
+        # Log but don't crash - this is a background task
+        print(f"Background LLM analysis failed for dataset {dataset_id}: {str(e)}")
 
 
 @router.post("/upload", response_model=UploadResponse)
@@ -73,7 +153,6 @@ async def upload_dataset(
 
     # Initialize services
     registry = DatasetRegistry()
-    storage = StorageService()
     norm_service = NormalizationService()
     time_detector = TimeDetector()
 
@@ -243,7 +322,6 @@ async def analyze_concentration(
     _validate_dataset_id(dataset_id)
 
     registry = DatasetRegistry()
-    storage = StorageService()
     analyzer = ConcentrationAnalyzer()
     exporter = ExportService()
     time_detector = TimeDetector()
@@ -259,6 +337,7 @@ async def analyze_concentration(
 
         # Load normalized data
         dataset_path = settings.datasets_path / dataset_id
+        storage = StorageService()
         df = storage.read_parquet(dataset_path / "normalized.parquet")
 
         # Get schema for time information
@@ -446,6 +525,17 @@ async def analyze_concentration(
             for entry in analysis_result.computation_log[-5:]
         ]
 
+        # Schedule LLM analysis as a background task if requested
+        if request.run_llm:
+            background_tasks.add_task(
+                _run_llm_analysis_background,
+                dataset_id,
+                analysis_result.data,
+                schema,
+                request.thresholds or [10, 20, 50],
+                registry,
+            )
+
         return ConcentrationResponse(
             dataset_id=dataset_id,
             period_grain=period_grain,
@@ -486,7 +576,6 @@ async def download_concentration_csv(
     _validate_dataset_id(dataset_id)
 
     registry = DatasetRegistry()
-    storage = StorageService()
 
     try:
         # Check if dataset and analysis exist
@@ -556,7 +645,6 @@ async def download_concentration_excel(
     _validate_dataset_id(dataset_id)
 
     registry = DatasetRegistry()
-    storage = StorageService()
 
     try:
         # Check if dataset and analysis exist
@@ -605,7 +693,6 @@ async def get_insights(
     _validate_dataset_id(dataset_id)
 
     registry = DatasetRegistry()
-    storage = StorageService()
 
     try:
         # Check if dataset exists
@@ -711,7 +798,7 @@ async def get_lineage(dataset_id: str, x_api_key: Optional[str] = Header(default
     try:
         # Check if dataset exists
         try:
-            state = registry.get_dataset_state(dataset_id)
+            registry.get_dataset_state(dataset_id)
         except DatasetNotFoundError as e:
             raise HTTPException(status_code=404, detail=str(e))
 
@@ -730,3 +817,202 @@ async def get_lineage(dataset_id: str, x_api_key: Optional[str] = Header(default
         raise HTTPException(
             status_code=500, detail=f"Error retrieving lineage: {str(e)}"
         )
+
+
+@router.post("/analyze/{dataset_id}/llm", response_model=LLMAnalysisResponse)
+async def analyze_llm(
+    dataset_id: str,
+    request: LLMAnalysisRequest,
+    x_api_key: Optional[str] = Header(default=None),
+):
+    """
+    Run LLM analysis on existing deterministic results.
+
+    This endpoint allows re-running LLM functions independently of the main analysis flow.
+    Useful for:
+    - Re-running after fixing API key issues
+    - Regenerating results if they were poor quality
+    - Testing different LLM functions or providers
+    - Manual control over LLM execution
+
+    Args:
+        dataset_id: The dataset identifier
+        request: LLM analysis parameters (force_refresh, functions)
+
+    Returns:
+        Summary of LLM functions executed and artifacts created
+    """
+    _require_api_key(x_api_key)
+    _validate_dataset_id(dataset_id)
+
+    start_time = time.time()
+    registry = DatasetRegistry()
+
+    try:
+        # Check if dataset exists
+        state = registry.get_dataset_state(dataset_id)
+        if not state["exists"]:
+            raise HTTPException(
+                status_code=404, detail=f"Dataset {dataset_id} not found"
+            )
+
+        # Validate that we have the required input files
+        dataset_path = settings.datasets_path / dataset_id
+        schema_path = dataset_path / "schema.json"
+        concentration_path = dataset_path / "analyses" / "concentration.json"
+
+        if not schema_path.exists():
+            raise HTTPException(
+                status_code=400,
+                detail="Schema not found. Upload and normalize data first.",
+            )
+
+        if not concentration_path.exists():
+            raise HTTPException(
+                status_code=400,
+                detail="Concentration analysis not found. Run concentration analysis first.",
+            )
+
+        # Load required context
+        with open(schema_path, "r") as f:
+            schema = json.load(f)
+        with open(concentration_path, "r") as f:
+            concentration_results = json.load(f)
+
+        # Determine which functions to run
+        available_functions = [
+            "narrative_insights",
+            "risk_flags",
+            "threshold_recommendations",
+        ]
+        functions_to_run = (
+            request.functions if request.functions else available_functions
+        )
+
+        # Check existing artifacts if not forcing refresh
+        llm_dir = dataset_path / "llm"
+        llm_dir.mkdir(exist_ok=True)
+
+        executed_functions = []
+        artifacts_created = []
+        warnings = []
+        llm_status = {"provider": settings.llm_provider, "model": settings.llm_model}
+
+        # Execute each requested function
+        for function_name in functions_to_run:
+            try:
+                # Check if artifact already exists
+                existing_artifacts = list(llm_dir.glob(f"{function_name}_*.json"))
+                if existing_artifacts and not request.force_refresh:
+                    warnings.append(
+                        f"Skipping {function_name} - artifact exists (use force_refresh=true to override)"
+                    )
+                    continue
+
+                # Execute the function
+                if function_name == "narrative_insights":
+                    # Extract thresholds from concentration results
+                    thresholds = [10, 20, 50]  # Default fallback
+                    if "TOTAL" in concentration_results:
+                        total_data = concentration_results["TOTAL"]
+                        if "concentration" in total_data:
+                            # Extract thresholds from the keys (e.g., "top_10", "top_20", "top_50")
+                            threshold_keys = [
+                                k
+                                for k in total_data["concentration"].keys()
+                                if k.startswith("top_")
+                            ]
+                            if threshold_keys:
+                                thresholds = [
+                                    int(k.split("_")[1]) for k in threshold_keys
+                                ]
+
+                    result, status = await llm_executor.generate_narrative_insights(
+                        dataset_id,
+                        concentration_results,
+                        schema,
+                        thresholds,
+                        request_id="api-call",
+                    )
+                    llm_status[f"{function_name}_used"] = status.used
+                    llm_status[f"{function_name}_reason"] = status.reason
+
+                elif function_name == "risk_flags":
+                    result, status = await llm_executor.generate_risk_flags(
+                        dataset_id, concentration_results, request_id="api-call"
+                    )
+                    llm_status[f"{function_name}_used"] = status.used
+                    llm_status[f"{function_name}_reason"] = status.reason
+
+                elif function_name == "threshold_recommendations":
+                    # Extract current thresholds from concentration results
+                    current_thresholds = [10, 20, 50]  # Default fallback
+                    if "TOTAL" in concentration_results:
+                        total_data = concentration_results["TOTAL"]
+                        if "concentration" in total_data:
+                            threshold_keys = [
+                                k
+                                for k in total_data["concentration"].keys()
+                                if k.startswith("top_")
+                            ]
+                            if threshold_keys:
+                                current_thresholds = [
+                                    int(k.split("_")[1]) for k in threshold_keys
+                                ]
+
+                    result, status = (
+                        await llm_executor.generate_threshold_recommendations(
+                            dataset_id,
+                            concentration_results,
+                            current_thresholds,
+                            request_id="api-call",
+                        )
+                    )
+                    llm_status[f"{function_name}_used"] = status.used
+                    llm_status[f"{function_name}_reason"] = status.reason
+
+                else:
+                    warnings.append(f"Unknown function: {function_name}")
+                    continue
+
+                executed_functions.append(function_name)
+
+                # Find the artifact file that was created
+                new_artifacts = list(llm_dir.glob(f"{function_name}_*.json"))
+                if new_artifacts:
+                    artifacts_created.extend([f.name for f in new_artifacts])
+
+            except Exception as e:
+                warnings.append(f"Failed to execute {function_name}: {str(e)}")
+
+        # Update lineage
+        if executed_functions:
+            registry.append_lineage_step(
+                dataset_id,
+                operation="llm_analysis",
+                inputs=["schema.json", "analyses/concentration.json"],
+                outputs=[f"llm/{artifact}" for artifact in artifacts_created],
+                params={
+                    "functions": executed_functions,
+                    "force_refresh": request.force_refresh,
+                    "provider": settings.llm_provider,
+                    "model": settings.llm_model,
+                },
+                metrics={"functions_executed": len(executed_functions)},
+            )
+
+        execution_time = int((time.time() - start_time) * 1000)
+
+        return LLMAnalysisResponse(
+            dataset_id=dataset_id,
+            functions_executed=executed_functions,
+            artifacts_created=artifacts_created,
+            llm_status=llm_status,
+            warnings=warnings,
+            execution_time_ms=execution_time,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"LLM analysis error: {str(e)}")

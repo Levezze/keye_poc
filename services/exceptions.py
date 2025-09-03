@@ -5,7 +5,7 @@ Custom exceptions for service layer operations.
 
 class DatasetNotFoundError(Exception):
     """Raised when a requested dataset does not exist."""
-    
+
     def __init__(self, dataset_id: str, message: str = None):
         self.dataset_id = dataset_id
         if message is None:
@@ -15,7 +15,7 @@ class DatasetNotFoundError(Exception):
 
 class DatasetOperationError(Exception):
     """Raised when an operation on a dataset fails."""
-    
+
     def __init__(self, dataset_id: str, operation: str, message: str = None):
         self.dataset_id = dataset_id
         self.operation = operation
@@ -26,7 +26,7 @@ class DatasetOperationError(Exception):
 
 class SchemaNotFoundError(Exception):
     """Raised when a schema for a dataset is not found."""
-    
+
     def __init__(self, dataset_id: str, message: str = None):
         self.dataset_id = dataset_id
         if message is None:

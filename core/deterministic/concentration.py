@@ -22,13 +22,13 @@ class ConcentrationResult:
 class ConcentrationAnalyzer:
     """
     Performs concentration analysis on data with deterministic tie-breaking.
-    
+
     Threshold Semantics:
     - Thresholds represent percentage cutoffs (e.g., 10 = 10%)
     - For each threshold X, includes entities whose cumulative percentage ≤ X%
     - If no entities qualify for a threshold, includes at least the top 1 entity
     - Tie-breaking: ORDER BY value DESC, then group_by ASC (deterministic)
-    
+
     Examples:
     - Entities: A(100), B(80), C(60), Total=240
     - Cumulative %: A(41.7%), B(75%), C(100%)
@@ -71,7 +71,7 @@ class ConcentrationAnalyzer:
         """
         if thresholds is None:
             thresholds = [10, 20, 50]
-        
+
         # Sort and deduplicate thresholds to ensure deterministic processing
         thresholds = sorted(set(thresholds))
 
@@ -86,7 +86,7 @@ class ConcentrationAnalyzer:
 
         computation_log = []
         results = {}
-        
+
         # Start timing if enabled
         start_time = time.perf_counter() if settings.analysis_timing else None
 
@@ -107,17 +107,19 @@ class ConcentrationAnalyzer:
 
             # Add summary statistics
             results["summary"] = self._generate_summary(results, parameters)
-            
+
             # Add timing metrics if enabled
             if settings.analysis_timing and start_time is not None:
                 analysis_time = time.perf_counter() - start_time
                 results["summary"]["analysis_time_seconds"] = round(analysis_time, 3)
-                computation_log.append({
-                    "step": "timing",
-                    "status": "completed", 
-                    "analysis_time_seconds": round(analysis_time, 3)
-                })
-            
+                computation_log.append(
+                    {
+                        "step": "timing",
+                        "status": "completed",
+                        "analysis_time_seconds": round(analysis_time, 3),
+                    }
+                )
+
             computation_log.append(
                 {
                     "step": "summary_generation",
@@ -209,16 +211,18 @@ class ConcentrationAnalyzer:
                     "total_value": float(grouped[value_col].sum()),
                 }
             )
-            
+
             # Add performance warning for large datasets
             if entity_count > settings.large_dataset_entity_threshold:
-                logs.append({
-                    "step": f"performance_warning_{period_name}",
-                    "status": "warning",
-                    "period": period_name,
-                    "message": f"Large dataset detected: {entity_count} entities (>{settings.large_dataset_entity_threshold} threshold)",
-                    "entities_count": entity_count
-                })
+                logs.append(
+                    {
+                        "step": f"performance_warning_{period_name}",
+                        "status": "warning",
+                        "period": period_name,
+                        "message": f"Large dataset detected: {entity_count} entities (>{settings.large_dataset_entity_threshold} threshold)",
+                        "entities_count": entity_count,
+                    }
+                )
         except Exception as e:
             logs.append(
                 {
@@ -236,7 +240,9 @@ class ConcentrationAnalyzer:
 
         total_value = grouped[value_col].sum()
         if total_value <= 0:
-            return {"error": "Total value is non-positive; cannot compute concentration"}, logs
+            return {
+                "error": "Total value is non-positive; cannot compute concentration"
+            }, logs
 
         # Sort with deterministic tie-breaking: value desc, then group_by asc
         grouped_sorted = grouped.sort_values(
@@ -250,7 +256,7 @@ class ConcentrationAnalyzer:
         ) * 100
 
         # Calculate concentration thresholds
-        # 
+        #
         # Threshold Logic:
         # - For threshold X%, include entities whose cumulative percentage ≤ X%
         # - This means we find the minimum set of top entities that together

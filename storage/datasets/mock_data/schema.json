@@ -1,0 +1,157 @@
+{
+  "dataset_id": "ds_0abba7aee453",
+  "generated_at": "2025-09-02T23:49:27.229474",
+  "columns": [
+    {
+      "name": "date",
+      "original_name": "date",
+      "dtype": "datetime64[ns]",
+      "role": "datetime",
+      "cardinality": 3,
+      "null_rate": 0.0,
+      "coercions": {
+        "currency_removed": 0,
+        "parentheses_to_negative": 0,
+        "scaling_applied": 0,
+        "unicode_minus_normalized": 0,
+        "percent_normalized": 0,
+        "datetime_parsed": 5,
+        "boolean_coerced": 0,
+        "failed_numeric_coercions": 0
+      },
+      "representation": null,
+      "anomalies": {
+        "null_count": 0,
+        "null_rate": 0.0,
+        "cardinality": 3
+      }
+    },
+    {
+      "name": "entity",
+      "original_name": "entity",
+      "dtype": "object",
+      "role": "categorical",
+      "cardinality": 2,
+      "null_rate": 0.0,
+      "coercions": {
+        "currency_removed": 0,
+        "parentheses_to_negative": 0,
+        "scaling_applied": 0,
+        "unicode_minus_normalized": 0,
+        "percent_normalized": 0,
+        "datetime_parsed": 0,
+        "boolean_coerced": 0,
+        "failed_numeric_coercions": 0
+      },
+      "representation": null,
+      "anomalies": {
+        "null_count": 0,
+        "null_rate": 0.0,
+        "cardinality": 2
+      }
+    },
+    {
+      "name": "revenue",
+      "original_name": "revenue",
+      "dtype": "float64",
+      "role": "numeric",
+      "cardinality": 5,
+      "null_rate": 0.0,
+      "coercions": {
+        "currency_removed": 0,
+        "parentheses_to_negative": 0,
+        "scaling_applied": 0,
+        "unicode_minus_normalized": 0,
+        "percent_normalized": 0,
+        "datetime_parsed": 0,
+        "boolean_coerced": 0,
+        "failed_numeric_coercions": 0
+      },
+      "representation": null,
+      "anomalies": {
+        "null_count": 0,
+        "null_rate": 0.0,
+        "cardinality": 5
+      }
+    },
+    {
+      "name": "region",
+      "original_name": "region",
+      "dtype": "object",
+      "role": "categorical",
+      "cardinality": 2,
+      "null_rate": 0.0,
+      "coercions": {
+        "currency_removed": 0,
+        "parentheses_to_negative": 0,
+        "scaling_applied": 0,
+        "unicode_minus_normalized": 0,
+        "percent_normalized": 0,
+        "datetime_parsed": 0,
+        "boolean_coerced": 0,
+        "failed_numeric_coercions": 0
+      },
+      "representation": null,
+      "anomalies": {
+        "null_count": 0,
+        "null_rate": 0.0,
+        "cardinality": 2
+      }
+    },
+    {
+      "name": "period_key",
+      "original_name": "period_key",
+      "dtype": "object",
+      "role": "categorical",
+      "cardinality": 3,
+      "null_rate": 0.0,
+      "coercions": {
+        "currency_removed": 0,
+        "parentheses_to_negative": 0,
+        "scaling_applied": 0,
+        "unicode_minus_normalized": 0,
+        "percent_normalized": 0,
+        "datetime_parsed": 0,
+        "boolean_coerced": 0,
+        "failed_numeric_coercions": 0
+      },
+      "representation": null,
+      "anomalies": {
+        "null_count": 0,
+        "null_rate": 0.0,
+        "cardinality": 3
+      }
+    }
+  ],
+  "period_grain": "date",
+  "period_grain_candidates": [
+    "date"
+  ],
+  "time_candidates": [
+    "date"
+  ],
+  "metadata": {
+    "row_count": 5,
+    "column_count": 5,
+    "multi_currency": false,
+    "currencies_detected": [],
+    "has_time_dimension": true
+  },
+  "warnings": [],
+  "transformations_summary": {
+    "total_transformations": 2,
+    "columns_modified": 1,
+    "transformation_types": [
+      "datetime_coercion",
+      "header_standardization"
+    ]
+  },
+  "created_at": "2025-09-03T03:49:27.236010+00:00",
+  "selected_time_columns": {
+    "date": "date"
+  },
+  "derivations": {
+    "date_column": "date"
+  },
+  "time_warnings": []
+}

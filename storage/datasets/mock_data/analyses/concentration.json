@@ -1,0 +1,170 @@
+{
+  "2023-01-15": {
+    "period": "2023-01-15",
+    "total_entities": 2,
+    "total_value": 1500.5,
+    "concentration": {
+      "top_50": {
+        "count": 1,
+        "value": 1000.5,
+        "percentage": 66.67777407530822,
+        "entities": [
+          "Company_A"
+        ]
+      },
+      "top_75": {
+        "count": 1,
+        "value": 1000.5,
+        "percentage": 66.67777407530822,
+        "entities": [
+          "Company_A"
+        ]
+      }
+    },
+    "head_sample": [
+      {
+        "entity": "Company_A",
+        "revenue": 1000.5,
+        "cumsum": 1000.5,
+        "cumulative_pct": 66.67777407530822
+      },
+      {
+        "entity": "Company_B",
+        "revenue": 500.0,
+        "cumsum": 1500.5,
+        "cumulative_pct": 100.0
+      }
+    ]
+  },
+  "2023-02-20": {
+    "period": "2023-02-20",
+    "total_entities": 2,
+    "total_value": 1951.25,
+    "concentration": {
+      "top_50": {
+        "count": 1,
+        "value": 1200.75,
+        "percentage": 61.53747597693786,
+        "entities": [
+          "Company_A"
+        ]
+      },
+      "top_75": {
+        "count": 1,
+        "value": 1200.75,
+        "percentage": 61.53747597693786,
+        "entities": [
+          "Company_A"
+        ]
+      }
+    },
+    "head_sample": [
+      {
+        "entity": "Company_A",
+        "revenue": 1200.75,
+        "cumsum": 1200.75,
+        "cumulative_pct": 61.53747597693786
+      },
+      {
+        "entity": "Company_B",
+        "revenue": 750.5,
+        "cumsum": 1951.25,
+        "cumulative_pct": 100.0
+      }
+    ]
+  },
+  "2023-03-10": {
+    "period": "2023-03-10",
+    "total_entities": 1,
+    "total_value": 980.25,
+    "concentration": {
+      "top_50": {
+        "count": 1,
+        "value": 980.25,
+        "percentage": 100.0,
+        "entities": [
+          "Company_A"
+        ]
+      },
+      "top_75": {
+        "count": 1,
+        "value": 980.25,
+        "percentage": 100.0,
+        "entities": [
+          "Company_A"
+        ]
+      }
+    },
+    "head_sample": [
+      {
+        "entity": "Company_A",
+        "revenue": 980.25,
+        "cumsum": 980.25,
+        "cumulative_pct": 100.0
+      }
+    ]
+  },
+  "TOTAL": {
+    "period": "TOTAL",
+    "total_entities": 2,
+    "total_value": 4432.0,
+    "concentration": {
+      "top_50": {
+        "count": 1,
+        "value": 3181.5,
+        "percentage": 71.78474729241877,
+        "entities": [
+          "Company_A"
+        ]
+      },
+      "top_75": {
+        "count": 1,
+        "value": 3181.5,
+        "percentage": 71.78474729241877,
+        "entities": [
+          "Company_A"
+        ]
+      }
+    },
+    "head_sample": [
+      {
+        "entity": "Company_A",
+        "revenue": 3181.5,
+        "cumsum": 3181.5,
+        "cumulative_pct": 71.78474729241877
+      },
+      {
+        "entity": "Company_B",
+        "revenue": 1250.5,
+        "cumsum": 4432.0,
+        "cumulative_pct": 100.0
+      }
+    ]
+  },
+  "summary": {
+    "analysis_type": "multi_period",
+    "periods_analyzed": 4,
+    "thresholds": [
+      50,
+      75
+    ],
+    "total_input_rows": 5,
+    "periods": [
+      {
+        "period": "2023-01-15",
+        "entities": 2,
+        "value": 1500.5
+      },
+      {
+        "period": "2023-02-20",
+        "entities": 2,
+        "value": 1951.25
+      },
+      {
+        "period": "2023-03-10",
+        "entities": 1,
+        "value": 980.25
+      }
+    ]
+  }
+}

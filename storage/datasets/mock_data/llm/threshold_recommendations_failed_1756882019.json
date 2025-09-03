@@ -1,0 +1,21 @@
+{
+  "function_name": "threshold_recommendations",
+  "request_id": "offline-demo",
+  "dataset_id": "mock_data",
+  "timestamp": "2025-09-03T06:47:00.542032+00:00",
+  "model": "gpt-4.1-mini",
+  "provider": "openai",
+  "context_hash": "8e166bc4c05fd6da",
+  "response": {
+    "suggested": [
+      10,
+      20,
+      50
+    ],
+    "rationale": "Using default industry-standard thresholds"
+  },
+  "latency_ms": 0,
+  "usage": null,
+  "cached": false,
+  "error": "Response validation failed: 1 validation error for ThresholdRecommendations\nrationale\n  String should have at most 300 characters [type=string_too_long, input_value='The concentration percen...ds for risk assessment.', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.11/v/string_too_long"
+}

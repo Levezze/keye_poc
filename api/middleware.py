@@ -6,15 +6,11 @@ import time
 import uuid
 import logging
 from typing import Dict, Any, Optional, List, Tuple
-from fastapi import Request, Response, HTTPException
+from fastapi import Request, HTTPException
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.middleware.trustedhost import (
-    TrustedHostMiddleware,
-)  # noqa: F401 (imported for potential future use)
 from collections import defaultdict
 from datetime import datetime, timedelta
-import asyncio
 
 from api.v1.models import ErrorResponse
 from fastapi.encoders import jsonable_encoder

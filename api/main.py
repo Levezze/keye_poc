@@ -72,7 +72,6 @@ async def health_check():
 @app.get("/healthz")
 async def health_check_enhanced():
     """Enhanced health check endpoint that validates dependencies."""
-    from pathlib import Path
     import os
 
     health_status = {"status": "healthy", "service": "keye-poc-api", "checks": {}}

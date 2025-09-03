@@ -3,21 +3,28 @@ API v1 Pydantic Models
 """
 
 from pydantic import BaseModel, Field, field_validator
-from typing import Literal, Optional, List, Dict, Any, Union
-from datetime import datetime
-import uuid
+from typing import Literal, Optional, List, Dict, Any
 
 
 class ErrorResponse(BaseModel):
     """Standardized error response envelope."""
-    
+
     error: Literal[
-        "ValidationError", "NotFound", "Conflict", "RateLimited", 
-        "PayloadTooLarge", "InternalError", "Unauthorized"
+        "ValidationError",
+        "NotFound",
+        "Conflict",
+        "RateLimited",
+        "PayloadTooLarge",
+        "InternalError",
+        "Unauthorized",
     ] = Field(description="Error type")
     message: str = Field(description="Human-readable error message")
-    details: Optional[Dict[str, Any]] = Field(default=None, description="Additional error details")
-    request_id: Optional[str] = Field(default=None, description="Request ID for tracking")
+    details: Optional[Dict[str, Any]] = Field(
+        default=None, description="Additional error details"
+    )
+    request_id: Optional[str] = Field(
+        default=None, description="Request ID for tracking"
+    )
 
 
 class UploadResponse(BaseModel):
@@ -63,11 +70,15 @@ class ConcentrationRequest(BaseModel):
     group_by: str = Field(description="Column to group by", min_length=1)
     value: str = Field(description="Column to aggregate", min_length=1)
     thresholds: Optional[List[int]] = Field(
-        default_factory=lambda: [10, 20, 50], 
-        description="Concentration thresholds (1-100)"
+        default_factory=lambda: [10, 20, 50],
+        description="Concentration thresholds (1-100)",
     )
-    
-    @field_validator('thresholds')
+    run_llm: bool = Field(
+        default=True,
+        description="Automatically run LLM analysis after concentration analysis completes",
+    )
+
+    @field_validator("thresholds")
     @classmethod
     def validate_thresholds(cls, v):
         if v is not None:
@@ -122,3 +133,50 @@ class InsightsResponse(BaseModel):
     opportunities: List[str]
     recommendations: List[str]
     confidence_notes: Optional[List[str]] = None
+
+
+class LLMAnalysisRequest(BaseModel):
+    """Request for LLM-only analysis on existing deterministic results."""
+
+    force_refresh: bool = Field(
+        default=False, description="Override existing LLM artifacts and regenerate"
+    )
+    functions: Optional[List[str]] = Field(
+        default=None,
+        description="Specific LLM functions to run. If None, runs all available functions",
+    )
+
+    @field_validator("functions")
+    @classmethod
+    def validate_functions(cls, v):
+        if v is not None:
+            valid_functions = {
+                "narrative_insights",
+                "risk_flags",
+                "threshold_recommendations",
+                "schema_description",
+                "data_quality_report",
+            }
+            for func in v:
+                if func not in valid_functions:
+                    raise ValueError(
+                        f"Invalid function '{func}'. Must be one of: {valid_functions}"
+                    )
+        return v
+
+
+class LLMAnalysisResponse(BaseModel):
+    """Response for LLM analysis endpoint."""
+
+    dataset_id: str
+    functions_executed: List[str] = Field(
+        description="LLM functions that were executed"
+    )
+    artifacts_created: List[str] = Field(
+        description="Files created in the llm/ directory"
+    )
+    llm_status: Dict[str, Any] = Field(
+        description="Provider, model, and execution details"
+    )
+    warnings: List[str] = Field(default_factory=list)
+    execution_time_ms: Optional[int] = None

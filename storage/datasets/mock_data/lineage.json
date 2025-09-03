@@ -1,0 +1,77 @@
+{
+  "dataset_id": "ds_0abba7aee453",
+  "created_at": "2025-09-03T03:49:27.216738+00:00",
+  "original_filename": "test_data.csv",
+  "steps": [
+    {
+      "id": "st_0001",
+      "timestamp": "2025-09-03T03:49:27.234276+00:00",
+      "operation": "normalize",
+      "inputs": [
+        "raw/test_data.csv"
+      ],
+      "outputs": [
+        "normalized.parquet",
+        "schema.json"
+      ],
+      "params": {
+        "original_columns": 4,
+        "original_rows": 5,
+        "normalized_columns": 5,
+        "normalized_rows": 5
+      },
+      "metrics": {
+        "transformations_applied": 2,
+        "warnings_generated": 0,
+        "columns_modified": 1,
+        "transformation_types": [
+          "datetime_coercion",
+          "header_standardization"
+        ],
+        "parquet_checksum": "36e6342a3429038aef350343922d37487e2315e7f11d83c85f61990a43421354"
+      }
+    },
+    {
+      "id": "st_0002",
+      "timestamp": "2025-09-03T03:49:27.236724+00:00",
+      "operation": "upload_and_process",
+      "inputs": [
+        "test_data.csv"
+      ],
+      "outputs": [
+        "normalized.parquet",
+        "schema.json"
+      ],
+      "params": {
+        "sheet": null,
+        "file_size": 196
+      },
+      "metrics": {}
+    },
+    {
+      "id": "st_0003",
+      "timestamp": "2025-09-03T03:49:27.278992+00:00",
+      "operation": "concentration_analysis",
+      "inputs": [
+        "normalized.parquet"
+      ],
+      "outputs": [
+        "analyses/concentration.json",
+        "analyses/concentration.csv",
+        "analyses/concentration.xlsx"
+      ],
+      "params": {
+        "group_by": "entity",
+        "value": "revenue",
+        "period_grain": "date",
+        "thresholds": [
+          50,
+          75
+        ]
+      },
+      "metrics": {
+        "computation_steps": 10
+      }
+    }
+  ]
+}
