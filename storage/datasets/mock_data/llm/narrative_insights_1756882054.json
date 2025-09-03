@@ -1,0 +1,47 @@
+{
+  "function_name": "narrative_insights",
+  "request_id": "offline-demo",
+  "dataset_id": "mock_data",
+  "timestamp": "2025-09-03T06:47:37.498914+00:00",
+  "model": "gpt-4o-mini",
+  "provider": "openai",
+  "context_hash": "8e8a09593828008f",
+  "response": {
+    "executive_summary": "The concentration analysis reveals a significant reliance on a single entity, Company_A, which poses both risks and opportunities for business growth.",
+    "key_findings": [
+      "Company_A accounts for 66.68% of total revenue in both analyzed periods.",
+      "Total value increased from 1500.5 to 1951.25, indicating growth potential."
+    ],
+    "risk_indicators": [
+      "High dependency on Company_A creates vulnerability to revenue loss if the relationship deteriorates.",
+      "Limited diversification with only two entities contributing to total revenue."
+    ],
+    "opportunities": [
+      "Potential to expand customer base to reduce reliance on Company_A.",
+      "Opportunity to enhance offerings to Company_A to increase revenue share."
+    ],
+    "recommendations": [
+      "Develop strategies to acquire new clients to diversify revenue sources.",
+      "Engage with Company_A to explore upsell opportunities and strengthen the partnership."
+    ],
+    "confidence_notes": []
+  },
+  "latency_ms": 3390,
+  "usage": {
+    "completion_tokens": 204,
+    "prompt_tokens": 542,
+    "total_tokens": 746,
+    "completion_tokens_details": {
+      "accepted_prediction_tokens": 0,
+      "audio_tokens": 0,
+      "reasoning_tokens": 0,
+      "rejected_prediction_tokens": 0
+    },
+    "prompt_tokens_details": {
+      "audio_tokens": 0,
+      "cached_tokens": 0
+    }
+  },
+  "cached": false,
+  "error": null
+}

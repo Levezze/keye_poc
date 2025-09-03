@@ -8,9 +8,13 @@ The Keye POC includes a robust, provider-agnostic LLM layer that enhances determ
 ┌─────────────────────────────────────────────────────────────┐
 │                    LLM Layer Architecture                   │
 ├─────────────────────────────────────────────────────────────┤
-│  API Routes (Optional)                                      │
-│  ├─ GET /api/v1/insights/{dataset_id}                      │
-│  └─ Enhanced with LLM results                              │
+│  API Routes (Dual-Mode Integration)                        │
+│  ├─ POST /api/v1/analyze/{dataset_id}/concentration        │
+│  │  └─ Automatic LLM execution via BackgroundTasks        │
+│  ├─ POST /api/v1/analyze/{dataset_id}/llm                  │
+│  │  └─ Manual LLM re-execution                             │
+│  └─ GET /api/v1/insights/{dataset_id}                      │
+│     └─ Enhanced with LLM results                           │
 ├─────────────────────────────────────────────────────────────┤
 │  Core Components                                            │
 │  ├─ executors.py      (High-level coordination)            │
@@ -157,6 +161,31 @@ client = OpenAI(
     api_key=settings.google_api_key,
     base_url="https://generativelanguage.googleapis.com/v1beta/"
 )
+```
+
+## Integration Modes
+
+### Automatic LLM Execution
+LLM functions automatically execute after concentration analysis via FastAPI BackgroundTasks:
+
+```python
+# In concentration analysis endpoint
+if request.run_llm:
+    background_tasks.add_task(
+        _run_llm_analysis_background,
+        dataset_id, concentration_results, schema, thresholds, registry
+    )
+```
+
+### Manual LLM Execution
+For re-running LLM when API keys fail or results are poor:
+
+```python
+# POST /api/v1/analyze/{dataset_id}/llm
+{
+  "force_refresh": true,
+  "functions": ["narrative_insights", "risk_flags", "threshold_recommendations"]
+}
 ```
 
 ## Usage Examples

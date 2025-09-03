@@ -55,11 +55,13 @@ PR_DESCRIPTION.md
 # Project specific
 storage/datasets/*
 !storage/datasets/.gitkeep
+!storage/datasets/mock_data/
 *.parquet
 *.xlsx
 *.csv
 !tests/fixtures/*.xlsx
 !tests/fixtures/*.csv
+!storage/datasets/mock_data
 
 # Temporary files
 *.tmp

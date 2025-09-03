@@ -56,7 +56,8 @@ Once running, visit:
 |----------|--------|-------------|
 | `/api/v1/upload` | POST | Upload Excel/CSV file |
 | `/api/v1/schema/{dataset_id}` | GET | Get detected schema |
-| `/api/v1/analyze/{dataset_id}/concentration` | POST | Run concentration analysis |
+| `/api/v1/analyze/{dataset_id}/concentration` | POST | Run concentration analysis (includes automatic LLM) |
+| `/api/v1/analyze/{dataset_id}/llm` | POST | Re-run LLM analysis only |
 | `/api/v1/insights/{dataset_id}` | GET | Get AI insights |
 | `/api/v1/download/{dataset_id}/concentration.csv` | GET | Download CSV results |
 | `/api/v1/download/{dataset_id}/concentration.xlsx` | GET | Download Excel results |
@@ -79,7 +80,7 @@ curl -X POST "http://localhost:8000/api/v1/upload" \
 curl "http://localhost:8000/api/v1/schema/ds_abc123" \
   -H "X-API-Key: dev-key"
 
-# Run concentration analysis (dynamic thresholds supported)
+# Run concentration analysis with automatic LLM enhancement
 curl -X POST "http://localhost:8000/api/v1/analyze/ds_abc123/concentration" \
   -H "Content-Type: application/json" \
   -H "X-API-Key: dev-key" \
@@ -87,7 +88,17 @@ curl -X POST "http://localhost:8000/api/v1/analyze/ds_abc123/concentration" \
   -d '{
     "group_by": "customer",
     "value": "revenue",
-    "thresholds": [5, 15, 50, 100]
+    "thresholds": [5, 15, 50, 100],
+    "run_llm": true
+  }'
+
+# Re-run LLM analysis only (if API keys failed or results were poor)
+curl -X POST "http://localhost:8000/api/v1/analyze/ds_abc123/llm" \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: dev-key" \
+  -d '{
+    "force_refresh": true,
+    "functions": ["narrative_insights", "risk_flags", "threshold_recommendations"]
   }'
 
 # Get insights

@@ -1,0 +1,49 @@
+{
+  "function_name": "narrative_insights",
+  "request_id": "offline-demo",
+  "dataset_id": "mock_data",
+  "timestamp": "2025-09-03T06:46:56.806829+00:00",
+  "model": "gpt-4o-mini",
+  "provider": "openai",
+  "context_hash": "8e8a09593828008f",
+  "response": {
+    "executive_summary": "The analysis reveals significant concentration risks with a dominant reliance on a single entity, Company_A, impacting revenue stability.",
+    "key_findings": [
+      "In both periods analyzed, Company_A accounts for 66.68% of total revenue.",
+      "Total revenue increased from 1500.5 to 1951.25, indicating growth but with high concentration risk."
+    ],
+    "risk_indicators": [
+      "Over-reliance on Company_A poses a risk to revenue stability.",
+      "Potential vulnerability to market changes affecting Company_A's performance."
+    ],
+    "opportunities": [
+      "Diversification of customer base to mitigate concentration risk.",
+      "Exploring additional revenue streams beyond the top entity."
+    ],
+    "recommendations": [
+      "Develop strategies to acquire new clients to reduce dependency on Company_A.",
+      "Conduct market analysis to identify potential clients in similar sectors."
+    ],
+    "confidence_notes": [
+      "Confidence in findings is high due to consistent concentration metrics across periods."
+    ]
+  },
+  "latency_ms": 4167,
+  "usage": {
+    "completion_tokens": 215,
+    "prompt_tokens": 542,
+    "total_tokens": 757,
+    "completion_tokens_details": {
+      "accepted_prediction_tokens": 0,
+      "audio_tokens": 0,
+      "reasoning_tokens": 0,
+      "rejected_prediction_tokens": 0
+    },
+    "prompt_tokens_details": {
+      "audio_tokens": 0,
+      "cached_tokens": 0
+    }
+  },
+  "cached": false,
+  "error": null
+}

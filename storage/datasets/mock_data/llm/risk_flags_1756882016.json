@@ -1,0 +1,36 @@
+{
+  "function_name": "risk_flags",
+  "request_id": "offline-demo",
+  "dataset_id": "mock_data",
+  "timestamp": "2025-09-03T06:46:59.083173+00:00",
+  "model": "gpt-4o-mini",
+  "provider": "openai",
+  "context_hash": "a23ac57a8d22bf04",
+  "response": {
+    "level": "medium",
+    "reasons": [
+      "Top 50 concentration is 66.68%, which is within the 60-80% range.",
+      "Top 75 concentration is also 66.68%, indicating consistent concentration across metrics.",
+      "The highest entity, Company_A, accounts for more than 60% of total value."
+    ],
+    "score": null
+  },
+  "latency_ms": 2275,
+  "usage": {
+    "completion_tokens": 80,
+    "prompt_tokens": 561,
+    "total_tokens": 641,
+    "completion_tokens_details": {
+      "accepted_prediction_tokens": 0,
+      "audio_tokens": 0,
+      "reasoning_tokens": 0,
+      "rejected_prediction_tokens": 0
+    },
+    "prompt_tokens_details": {
+      "audio_tokens": 0,
+      "cached_tokens": 0
+    }
+  },
+  "cached": false,
+  "error": null
+}

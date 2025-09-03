@@ -9,7 +9,7 @@ from datetime import datetime, UTC
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 from config.settings import settings
-from services.exceptions import DatasetNotFoundError, SchemaNotFoundError
+from services.exceptions import DatasetNotFoundError
 
 
 class DatasetRegistry:
@@ -113,7 +113,9 @@ class DatasetRegistry:
         lineage_path = self.storage_path / dataset_id / "lineage.json"
 
         if not lineage_path.exists():
-            raise DatasetNotFoundError(dataset_id, f"Lineage file not found for dataset {dataset_id}")
+            raise DatasetNotFoundError(
+                dataset_id, f"Lineage file not found for dataset {dataset_id}"
+            )
 
         lineage = self._load_json(lineage_path)
 

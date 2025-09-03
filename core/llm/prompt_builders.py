@@ -10,7 +10,6 @@ import re
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 
-from core.llm.types import get_json_schema, LLM_FUNCTION_MODELS
 
 
 class PromptSecurityError(Exception):
@@ -182,8 +181,8 @@ class PromptBuilder:
         return cls._redact_pii(question)
 
 
-# System prompts for each LLM function
-SYSTEM_PROMPTS = {
+# LLM function prompts organized by function name
+LLM_FUNCTION_PROMPTS = {
     "schema_description": """You are a data schema analyst. Your task is to analyze dataset schemas and provide business context descriptions.
 
     CRITICAL REQUIREMENTS:
@@ -308,7 +307,7 @@ def build_schema_description_prompt(
     context_json = PromptBuilder._prepare_context_json(context)
 
     return [
-        {"role": "system", "content": SYSTEM_PROMPTS["schema_description"]},
+        {"role": "system", "content": LLM_FUNCTION_PROMPTS["schema_description"]},
         {
             "role": "user",
             "content": f"CONTEXT_JSON:\n{context_json}\n\nAnalyze this dataset schema and provide business context descriptions.",
@@ -333,7 +332,7 @@ def build_narrative_insights_prompt(
     context_json = PromptBuilder._prepare_context_json(context)
 
     return [
-        {"role": "system", "content": SYSTEM_PROMPTS["narrative_insights"]},
+        {"role": "system", "content": LLM_FUNCTION_PROMPTS["narrative_insights"]},
         {
             "role": "user",
             "content": f"CONTEXT_JSON:\n{context_json}\n\nGenerate executive insights from this concentration analysis.",
@@ -342,14 +341,14 @@ def build_narrative_insights_prompt(
 
 
 def build_risk_flags_prompt(
-    concentration_results: Dict[str, Any]
+    concentration_results: Dict[str, Any],
 ) -> List[Dict[str, str]]:
     """Build prompt for risk flags function."""
     context = {"concentration_analysis": concentration_results}
     context_json = PromptBuilder._prepare_context_json(context)
 
     return [
-        {"role": "system", "content": SYSTEM_PROMPTS["risk_flags"]},
+        {"role": "system", "content": LLM_FUNCTION_PROMPTS["risk_flags"]},
         {
             "role": "user",
             "content": f"CONTEXT_JSON:\n{context_json}\n\nAssess concentration risk level based on these metrics.",
@@ -370,7 +369,7 @@ def build_data_quality_prompt(
     context_json = PromptBuilder._prepare_context_json(context)
 
     return [
-        {"role": "system", "content": SYSTEM_PROMPTS["data_quality_report"]},
+        {"role": "system", "content": LLM_FUNCTION_PROMPTS["data_quality_report"]},
         {
             "role": "user",
             "content": f"CONTEXT_JSON:\n{context_json}\n\nGenerate a data quality assessment report.",
@@ -390,7 +389,10 @@ def build_threshold_recommendations_prompt(
     context_json = PromptBuilder._prepare_context_json(context)
 
     return [
-        {"role": "system", "content": SYSTEM_PROMPTS["threshold_recommendations"]},
+        {
+            "role": "system",
+            "content": LLM_FUNCTION_PROMPTS["threshold_recommendations"],
+        },
         {
             "role": "user",
             "content": f"CONTEXT_JSON:\n{context_json}\n\nRecommend optimal concentration analysis thresholds.",
@@ -408,7 +410,7 @@ def build_qa_prompt(
     context_json = PromptBuilder._prepare_context_json(context)
 
     return [
-        {"role": "system", "content": SYSTEM_PROMPTS["qa_over_context"]},
+        {"role": "system", "content": LLM_FUNCTION_PROMPTS["qa_over_context"]},
         {
             "role": "user",
             "content": f"CONTEXT_JSON:\n{context_json}\n\nUser Question: {safe_question}\n\nAnswer the question based only on the provided context data.",

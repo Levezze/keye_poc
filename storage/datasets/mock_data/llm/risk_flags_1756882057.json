@@ -1,0 +1,36 @@
+{
+  "function_name": "risk_flags",
+  "request_id": "offline-demo",
+  "dataset_id": "mock_data",
+  "timestamp": "2025-09-03T06:47:39.135190+00:00",
+  "model": "gpt-4o-mini",
+  "provider": "openai",
+  "context_hash": "a23ac57a8d22bf04",
+  "response": {
+    "level": "medium",
+    "reasons": [
+      "Top 50 concentration is 66.68%, which falls within the medium risk category.",
+      "Top 50 concentration for the second period is 61.54%, indicating a consistent level of concentration.",
+      "Both periods show a single entity (Company_A) holding a significant share of total value."
+    ],
+    "score": null
+  },
+  "latency_ms": 1635,
+  "usage": {
+    "completion_tokens": 81,
+    "prompt_tokens": 561,
+    "total_tokens": 642,
+    "completion_tokens_details": {
+      "accepted_prediction_tokens": 0,
+      "audio_tokens": 0,
+      "reasoning_tokens": 0,
+      "rejected_prediction_tokens": 0
+    },
+    "prompt_tokens_details": {
+      "audio_tokens": 0,
+      "cached_tokens": 0
+    }
+  },
+  "cached": false,
+  "error": null
+}
