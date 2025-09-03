@@ -24,11 +24,11 @@ class TestConcentrationAnalyzer:
         
         # Check basic structure
         assert isinstance(result, ConcentrationResult)
-        assert "ALL" in result.data
+        assert "TOTAL" in result.data
         assert result.parameters["analysis_type"] == "single_period"
         
         # Check concentration calculations
-        all_data = result.data["ALL"]
+        all_data = result.data["TOTAL"]
         assert all_data["total_entities"] == 5
         assert all_data["total_value"] == 300.0
         
@@ -59,7 +59,7 @@ class TestConcentrationAnalyzer:
         })
         
         result = self.analyzer.analyze(df, "entity", "revenue")
-        all_data = result.data["ALL"]
+        all_data = result.data["TOTAL"]
         
         # Check head sample shows deterministic ordering
         head_sample = all_data["head_sample"]
@@ -107,7 +107,7 @@ class TestConcentrationAnalyzer:
         })
         
         result = self.analyzer.analyze(df, "entity", "revenue")
-        all_data = result.data["ALL"]
+        all_data = result.data["TOTAL"]
         
         # Total should include all values (including negatives)
         assert all_data["total_value"] == 130.0  # 100 + 0 + (-20) + 50
@@ -130,7 +130,7 @@ class TestConcentrationAnalyzer:
         custom_thresholds = [25, 75]
         result = self.analyzer.analyze(df, "entity", "revenue", thresholds=custom_thresholds)
         
-        concentration = result.data["ALL"]["concentration"]
+        concentration = result.data["TOTAL"]["concentration"]
         
         # Should only have top_25 and top_75
         assert "top_25" in concentration
@@ -151,7 +151,7 @@ class TestConcentrationAnalyzer:
         result = self.analyzer.analyze(df, "entity", "revenue")
         
         # Should handle gracefully with error
-        assert "error" in result.data or result.data["ALL"].get("error")
+        assert "error" in result.data or result.data["TOTAL"].get("error")
     
     def test_edge_case_single_entity(self):
         """Test concentration analysis with single entity."""
@@ -161,7 +161,7 @@ class TestConcentrationAnalyzer:
         })
         
         result = self.analyzer.analyze(df, "entity", "revenue")
-        all_data = result.data["ALL"]
+        all_data = result.data["TOTAL"]
         
         assert all_data["total_entities"] == 1
         assert all_data["total_value"] == 100.0
@@ -184,7 +184,7 @@ class TestConcentrationAnalyzer:
         result = self.analyzer.analyze(df, "entity", "revenue")
         
         # Should handle zero total gracefully
-        assert "error" in result.data["ALL"]
+        assert result.data["TOTAL"]["error"] == "Total value is non-positive; cannot compute concentration"
     
     def test_computation_log_tracking(self):
         """Test that computation steps are properly logged."""
@@ -233,7 +233,7 @@ class TestConcentrationAnalyzer:
         })
         
         result = self.analyzer.analyze(df, "entity", "revenue")
-        all_data = result.data["ALL"]
+        all_data = result.data["TOTAL"]
         
         assert all_data["total_entities"] == 100
         assert all_data["total_value"] > 0

@@ -42,7 +42,7 @@ class ExportService:
                                     "threshold": threshold.replace("top_", ""),
                                     "count": metrics.get("count", 0),
                                     "value": metrics.get("value", 0),
-                                    "pct_of_total": metrics.get("pct_of_total", 0),
+                                    "pct_of_total": round(metrics.get("pct_of_total", 0), 1),
                                 }
                             )
 
@@ -77,7 +77,7 @@ class ExportService:
                         if isinstance(metrics, dict):
                             row[f"{threshold}_count"] = metrics.get("count", 0)
                             row[f"{threshold}_value"] = metrics.get("value", 0)
-                            row[f"{threshold}_pct"] = metrics.get("pct_of_total", 0)
+                            row[f"{threshold}_pct"] = round(metrics.get("pct_of_total", 0), 1)
                 summary_rows.append(row)
 
         if summary_rows:

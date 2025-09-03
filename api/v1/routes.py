@@ -306,7 +306,7 @@ async def analyze_concentration(
             json.dump(analysis_result.data, f, indent=2, default=str)
 
         # Format data for exports (convert from analyzer format to export format)
-        export_data = {"by_period": []}
+        export_data = {"by_period": [], "details": []}
 
         for period_key, period_data in analysis_result.data.items():
             if period_key == "summary":
@@ -321,6 +321,21 @@ async def analyze_concentration(
                     "top_50": concentration.get("top_50") if concentration else None,
                 }
             )
+            
+            # Add head sample to details (limit to 10 items per period)
+            head_sample = period_data.get("head_sample", [])[:10]
+            for item in head_sample:
+                detail_item = item.copy()
+                detail_item["period"] = period_key
+                export_data["details"].append(detail_item)
+
+        # Add export metadata
+        export_data.update({
+            "group_by": request.group_by,
+            "value_column": request.value,
+            "time_column": period_key_column or "none",
+            "thresholds": request.thresholds or [10, 20, 50],
+        })
 
         # Generate exports
         analyses_path = dataset_path / "analyses"
@@ -371,13 +386,16 @@ async def analyze_concentration(
                     "pct_of_total": metric_data.get("percentage", 0.0),
                 }
 
+            # Get head sample (limit to 10 items for API payload size)
+            head_sample = period_data.get("head_sample", [])[:10]
+            
             period_result = {
                 "period": period_key,
                 "total": period_data.get("total_value", 0),
                 "top_10": convert_concentration_metric(concentration.get("top_10")),
                 "top_20": convert_concentration_metric(concentration.get("top_20")),
                 "top_50": convert_concentration_metric(concentration.get("top_50")),
-                "head": [],  # Not populated in this version
+                "head": head_sample,
             }
 
             if period_key == "TOTAL" or period_key == "ALL":
@@ -453,6 +471,10 @@ async def download_concentration_csv(
             )
 
         # Read CSV content so we can append dimension metadata for POC UX
+        # TODO: TECH DEBT - Replace post-append metadata with proper CSV structure
+        # Current: Appends "GroupBy,{value}" line after CSV data  
+        # Better: Add metadata as proper CSV columns or separate metadata.csv file
+        # Tracked in: docs/tech_debt.md
         try:
             with open(csv_path, "r", encoding="utf-8") as f:
                 content = f.read()

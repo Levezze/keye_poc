@@ -19,7 +19,21 @@ class ConcentrationResult:
 
 
 class ConcentrationAnalyzer:
-    """Performs concentration analysis on data with deterministic tie-breaking."""
+    """
+    Performs concentration analysis on data with deterministic tie-breaking.
+    
+    Threshold Semantics:
+    - Thresholds represent percentage cutoffs (e.g., 10 = 10%)
+    - For each threshold X, includes entities whose cumulative percentage ≤ X%
+    - If no entities qualify for a threshold, includes at least the top 1 entity
+    - Tie-breaking: ORDER BY value DESC, then group_by ASC (deterministic)
+    
+    Examples:
+    - Entities: A(100), B(80), C(60), Total=240
+    - Cumulative %: A(41.7%), B(75%), C(100%)
+    - Threshold 10%: A only (41.7% > 10% but at least 1 entity included)
+    - Threshold 50%: A + B (75% > 50% but B's individual contribution fits)
+    """
 
     def analyze(
         self,
@@ -32,15 +46,27 @@ class ConcentrationAnalyzer:
         """
         Perform concentration analysis with deterministic tie-breaking.
 
+        Analyzes data concentration by computing cumulative percentages and finding
+        entities that contribute to each threshold percentage of total value.
+
         Args:
             df: Input DataFrame
-            group_by: Column to group by (e.g., entity)
-            value_column: Column to aggregate (e.g., revenue)
+            group_by: Column to group by (e.g., entity, customer)
+            value_column: Column to aggregate (e.g., revenue, sales)
             period_key_column: Optional period column for time-based analysis
-            thresholds: Concentration thresholds (default [10, 20, 50])
+            thresholds: Concentration thresholds in percentage (default [10, 20, 50])
+                       Each threshold X includes entities with cumulative % ≤ X%,
+                       with at least 1 entity if none qualify.
 
         Returns:
-            ConcentrationResult with analysis data
+            ConcentrationResult with analysis data including:
+            - Per-threshold counts, values, and percentages
+            - Head sample of top entities (for display)
+            - Computation log for auditability
+            - Formula documentation
+
+        Raises:
+            Will return error in results if total value ≤ 0 (cannot compute percentages)
         """
         if thresholds is None:
             thresholds = [10, 20, 50]
@@ -67,9 +93,9 @@ class ConcentrationAnalyzer:
             else:
                 # Single-period analysis
                 single_result, single_log = self._analyze_single_period(
-                    df, group_by, value_column, thresholds, period_name="ALL"
+                    df, group_by, value_column, thresholds, period_name="TOTAL"
                 )
-                results = {"ALL": single_result}
+                results = {"TOTAL": single_result}
                 computation_log.extend(single_log)
 
             # Add summary statistics
@@ -179,8 +205,8 @@ class ConcentrationAnalyzer:
             return {"error": "No data after grouping"}, logs
 
         total_value = grouped[value_col].sum()
-        if total_value == 0:
-            return {"error": "Total value is zero"}, logs
+        if total_value <= 0:
+            return {"error": "Total value is non-positive; cannot compute concentration"}, logs
 
         # Sort with deterministic tie-breaking: value desc, then group_by asc
         grouped_sorted = grouped.sort_values(
@@ -194,6 +220,14 @@ class ConcentrationAnalyzer:
         ) * 100
 
         # Calculate concentration thresholds
+        # 
+        # Threshold Logic:
+        # - For threshold X%, include entities whose cumulative percentage ≤ X%
+        # - This means we find the minimum set of top entities that together
+        #   account for AT MOST X% of total value
+        # - If no entities qualify (first entity > X%), include at least 1 entity
+        # - Example: A(60%), B(30%), C(10%) with threshold 50%
+        #   → A alone is 60% > 50%, but we include A (at least 1 entity rule)
         concentration = {}
         for threshold in thresholds:
             # Find entities where cumulative percentage <= threshold
@@ -202,6 +236,7 @@ class ConcentrationAnalyzer:
 
             if len(entities_in_threshold) == 0:
                 # If no entities meet the threshold, include at least the first one
+                # This ensures every threshold has at least one entity
                 entities_in_threshold = grouped_sorted.head(1)
 
             concentration[f"top_{threshold}"] = {
