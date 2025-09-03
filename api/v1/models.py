@@ -2,7 +2,7 @@
 API v1 Pydantic Models
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Literal, Optional, List, Dict, Any
 from datetime import datetime
 
@@ -28,7 +28,7 @@ class ColumnInfo(BaseModel):
     )
     cardinality: int
     null_rate: float
-    notes: List[Dict[str, Any]] = []
+    notes: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class SchemaResponse(BaseModel):
@@ -39,20 +39,35 @@ class SchemaResponse(BaseModel):
     period_grain: str = Field(description="year_month|year_quarter|year|none")
     period_grain_candidates: List[str] = Field(description="Possible period grains")
     time_candidates: List[str]
-    warnings: List[str] = []
-    notes: List[str] = []
+    warnings: List[str] = Field(default_factory=list)
+    notes: List[str] = Field(default_factory=list)
     llm_insights: Optional[Dict[str, Any]] = None
 
 
 class ConcentrationRequest(BaseModel):
     """Request for concentration analysis."""
 
-    group_by: str = Field(description="Column to group by")
-    value: str = Field(description="Column to aggregate")
-    time: Optional[str] = Field(None, description="Time column to use")
+    group_by: str = Field(description="Column to group by", min_length=1)
+    value: str = Field(description="Column to aggregate", min_length=1)
     thresholds: Optional[List[int]] = Field(
-        [10, 20, 50], description="Concentration thresholds"
+        default_factory=lambda: [10, 20, 50], 
+        description="Concentration thresholds (1-100)"
     )
+    
+    @field_validator('thresholds')
+    @classmethod
+    def validate_thresholds(cls, v):
+        if v is not None:
+            if not v:  # Empty list
+                raise ValueError("Thresholds list cannot be empty")
+            if len(v) > 10:
+                raise ValueError("Maximum 10 thresholds allowed")
+            # Sort and deduplicate thresholds
+            v = sorted(set(v))
+            for threshold in v:
+                if threshold < 1 or threshold > 100:
+                    raise ValueError("Thresholds must be between 1 and 100")
+        return v
 
 
 class ConcentrationMetrics(BaseModel):
@@ -68,10 +83,8 @@ class PeriodConcentration(BaseModel):
 
     period: str
     total: float
-    top_10: Optional[ConcentrationMetrics] = None
-    top_20: Optional[ConcentrationMetrics] = None
-    top_50: Optional[ConcentrationMetrics] = None
-    head: List[Dict[str, Any]] = []
+    concentration: Dict[str, ConcentrationMetrics] = Field(default_factory=dict)
+    head: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class ConcentrationResponse(BaseModel):

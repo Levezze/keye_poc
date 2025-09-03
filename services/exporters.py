@@ -25,26 +25,71 @@ class ExportService:
         Returns:
             Path to exported file
         """
-        # Convert results to DataFrame format
-        rows = []
+        # Build a standard single-table CSV to remain parser-friendly
+        # Supports both legacy shape (top_10 keys at period root) and new shape (concentration dict)
+        rows: List[Dict[str, Any]] = []
 
-        if "by_period" in results:
-            for period_data in results["by_period"]:
-                period = period_data["period"]
-                for threshold in ["top_10", "top_20", "top_50"]:
-                    # Only include thresholds that have real metrics (skip None)
-                    if threshold in period_data:
-                        metrics = period_data[threshold]
-                        if isinstance(metrics, dict):
-                            rows.append(
-                                {
-                                    "period": period,
-                                    "threshold": threshold.replace("top_", ""),
-                                    "count": metrics.get("count", 0),
-                                    "value": metrics.get("value", 0),
-                                    "pct_of_total": metrics.get("pct_of_total", 0),
-                                }
-                            )
+        def _append_rows_for_period(period_label: str, payload: Dict[str, Any]):
+            # Preferred: nested concentration dict from analyzer
+            concentration = payload.get("concentration")
+            if isinstance(concentration, dict) and concentration:
+                # Sort thresholds by numeric value for deterministic order
+                sorted_keys = sorted(concentration.keys(), key=lambda x: int(x.split('_')[1]) if '_' in x else 0)
+                for threshold_key in sorted_keys:
+                    metrics = concentration[threshold_key]
+                    if isinstance(metrics, dict):
+                        threshold_display = threshold_key.replace("top_", "")
+                        try:
+                            threshold_value = int(threshold_display)
+                        except Exception:
+                            threshold_value = threshold_display
+                        rows.append(
+                            {
+                                "period": period_label,
+                                "threshold": threshold_value,
+                                "count": metrics.get("count", 0),
+                                "value": metrics.get("value", 0),
+                                "pct_of_total": round(
+                                    metrics.get(
+                                        "percentage", metrics.get("pct_of_total", 0)
+                                    ),
+                                    1,
+                                ),
+                            }
+                        )
+                return
+
+            # Fallback: legacy top_* keys on the period dict
+            for key, metrics in payload.items():
+                if isinstance(metrics, dict) and str(key).startswith("top_"):
+                    threshold_display = str(key).replace("top_", "")
+                    try:
+                        threshold_value = int(threshold_display)
+                    except Exception:
+                        threshold_value = threshold_display
+                    rows.append(
+                        {
+                            "period": period_label,
+                            "threshold": threshold_value,
+                            "count": metrics.get("count", 0),
+                            "value": metrics.get("value", 0),
+                            "pct_of_total": round(
+                                metrics.get(
+                                    "pct_of_total", metrics.get("percentage", 0)
+                                ),
+                                1,
+                            ),
+                        }
+                    )
+
+        # by_period entries
+        for period_data in results.get("by_period", []) or []:
+            period = period_data.get("period", "TOTAL")
+            _append_rows_for_period(period, period_data)
+
+        # totals fallback for single-period datasets
+        if not rows and isinstance(results.get("totals"), dict):
+            _append_rows_for_period("TOTAL", results["totals"])
 
         df = pd.DataFrame(rows)
         return StorageService.write_csv(df, output_path)
@@ -67,18 +112,67 @@ class ExportService:
         sheets = {}
 
         # Summary sheet
-        summary_rows = []
-        if "by_period" in results:
+        summary_rows: List[Dict[str, Any]] = []
+        if results.get("by_period"):
             for period_data in results["by_period"]:
-                row = {"period": period_data["period"], "total": period_data["total"]}
-                for threshold in ["top_10", "top_20", "top_50"]:
-                    if threshold in period_data:
-                        metrics = period_data[threshold]
+                row: Dict[str, Any] = {
+                    "period": period_data.get("period"),
+                    "total": period_data.get("total", 0),
+                }
+                # Preferred: nested concentration dict
+                concentration = period_data.get("concentration")
+                if isinstance(concentration, dict) and concentration:
+                    # Sort thresholds by numeric value for deterministic column order
+                    sorted_keys = sorted(concentration.keys(), key=lambda x: int(x.split('_')[1]) if '_' in x else 0)
+                    for threshold_key in sorted_keys:
+                        metrics = concentration[threshold_key]
                         if isinstance(metrics, dict):
-                            row[f"{threshold}_count"] = metrics.get("count", 0)
-                            row[f"{threshold}_value"] = metrics.get("value", 0)
-                            row[f"{threshold}_pct"] = metrics.get("pct_of_total", 0)
+                            row[f"{threshold_key}_count"] = metrics.get("count", 0)
+                            row[f"{threshold_key}_value"] = metrics.get("value", 0)
+                            row[f"{threshold_key}_pct"] = round(
+                                metrics.get(
+                                    "percentage", metrics.get("pct_of_total", 0)
+                                ),
+                                1,
+                            )
+                else:
+                    # Fallback: legacy top_* keys on the period dict
+                    for key, metrics in period_data.items():
+                        if isinstance(metrics, dict) and str(key).startswith("top_"):
+                            row[f"{key}_count"] = metrics.get("count", 0)
+                            row[f"{key}_value"] = metrics.get("value", 0)
+                            row[f"{key}_pct"] = round(
+                                metrics.get(
+                                    "pct_of_total", metrics.get("percentage", 0)
+                                ),
+                                1,
+                            )
                 summary_rows.append(row)
+        elif isinstance(results.get("totals"), dict):
+            # Handle single-period case (no time dimension)
+            totals_data = results["totals"]
+            row = {"period": "TOTAL", "total": totals_data.get("total", 0)}
+            concentration = totals_data.get("concentration", {})
+            if isinstance(concentration, dict) and concentration:
+                # Sort thresholds by numeric value for deterministic column order
+                sorted_keys = sorted(concentration.keys(), key=lambda x: int(x.split('_')[1]) if '_' in x else 0)
+                for threshold_key in sorted_keys:
+                    metrics = concentration[threshold_key]
+                    if isinstance(metrics, dict):
+                        row[f"{threshold_key}_count"] = metrics.get("count", 0)
+                        row[f"{threshold_key}_value"] = metrics.get("value", 0)
+                        row[f"{threshold_key}_pct"] = round(
+                            metrics.get("percentage", metrics.get("pct_of_total", 0)), 1
+                        )
+            else:
+                for key, metrics in totals_data.items():
+                    if isinstance(metrics, dict) and str(key).startswith("top_"):
+                        row[f"{key}_count"] = metrics.get("count", 0)
+                        row[f"{key}_value"] = metrics.get("value", 0)
+                        row[f"{key}_pct"] = round(
+                            metrics.get("pct_of_total", metrics.get("percentage", 0)), 1
+                        )
+            summary_rows.append(row)
 
         if summary_rows:
             sheets["Summary"] = pd.DataFrame(summary_rows)
@@ -86,6 +180,32 @@ class ExportService:
         # Details sheet (if available)
         if "details" in results:
             sheets["Details"] = pd.DataFrame(results["details"])
+
+        # Head samples sheet - show top entities for each period
+        head_sample_rows = []
+        if "by_period" in results and len(results["by_period"]) > 0:
+            for period_data in results["by_period"]:
+                period = period_data["period"]
+                head_sample = period_data.get("head_sample", [])
+                for i, entity in enumerate(
+                    head_sample[:10]
+                ):  # Limit to top 10 for readability
+                    row = entity.copy()
+                    row["period"] = period
+                    row["rank"] = i + 1
+                    head_sample_rows.append(row)
+        elif "totals" in results:
+            # Single period case
+            totals_data = results["totals"]
+            head_sample = totals_data.get("head_sample", [])
+            for i, entity in enumerate(head_sample[:10]):
+                row = entity.copy()
+                row["period"] = "TOTAL"
+                row["rank"] = i + 1
+                head_sample_rows.append(row)
+
+        if head_sample_rows:
+            sheets["Top_Entities"] = pd.DataFrame(head_sample_rows)
 
         # Parameters sheet
         params_data = {

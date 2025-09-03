@@ -306,31 +306,70 @@ async def analyze_concentration(
             json.dump(analysis_result.data, f, indent=2, default=str)
 
         # Format data for exports (convert from analyzer format to export format)
-        export_data = {"by_period": []}
+        export_data = {"by_period": [], "details": []}
 
         for period_key, period_data in analysis_result.data.items():
             if period_key == "summary":
                 continue
             concentration = period_data.get("concentration", {})
-            export_data["by_period"].append(
-                {
-                    "period": period_key,
-                    "total": period_data.get("total_value", 0),
-                    "top_10": concentration.get("top_10") if concentration else None,
-                    "top_20": concentration.get("top_20") if concentration else None,
-                    "top_50": concentration.get("top_50") if concentration else None,
-                }
-            )
+            period_export = {
+                "period": period_key,
+                "total": period_data.get("total_value", 0),
+                "concentration": concentration,
+                "head_sample": period_data.get("head_sample", []),
+            }
+            export_data["by_period"].append(period_export)
+            
+            # Add head sample to details (limit to 10 items per period)
+            head_sample = period_data.get("head_sample", [])[:10]
+            for item in head_sample:
+                detail_item = item.copy()
+                detail_item["period"] = period_key
+                export_data["details"].append(detail_item)
 
-        # Generate exports
+        # Add totals data for single-period export fallback
+        if "TOTAL" in analysis_result.data:
+            totals_data = analysis_result.data["TOTAL"]
+            export_data["totals"] = {
+                "total": totals_data.get("total_value", 0),
+                "concentration": totals_data.get("concentration", {}),
+                "head_sample": totals_data.get("head_sample", []),
+            }
+        
+        # Add export metadata
+        export_data.update({
+            "group_by": request.group_by,
+            "value_column": request.value,
+            "time_column": period_key_column or "none",
+            "thresholds": request.thresholds or [10, 20, 50],
+        })
+
+        # Generate exports with error handling
         analyses_path = dataset_path / "analyses"
-        csv_path = exporter.export_concentration_csv(
-            export_data, analyses_path / "concentration.csv"
-        )
-        excel_path = exporter.export_concentration_excel(
-            export_data, analyses_path / "concentration.xlsx"
-        )
-        export_paths = {"csv": csv_path, "xlsx": excel_path}
+        export_paths = {}
+        
+        try:
+            # Build all export data in memory first, then write files
+            csv_path = exporter.export_concentration_csv(
+                export_data, analyses_path / "concentration.csv"
+            )
+            export_paths["csv"] = csv_path
+            
+            excel_path = exporter.export_concentration_excel(
+                export_data, analyses_path / "concentration.xlsx"
+            )
+            export_paths["xlsx"] = excel_path
+            
+        except Exception as export_error:
+            # Log export failure but don't fail the entire analysis
+            analysis_result.computation_log.append({
+                "step": "export_generation",
+                "status": "failed", 
+                "error": str(export_error),
+                "export_formats_attempted": ["csv", "xlsx"]
+            })
+            # Continue without export files
+            export_paths = {}
 
         # Record analysis step
         registry.append_lineage_step(
@@ -371,13 +410,19 @@ async def analyze_concentration(
                     "pct_of_total": metric_data.get("percentage", 0.0),
                 }
 
+            # Get head sample (limit to 10 items for API payload size)
+            head_sample = period_data.get("head_sample", [])[:10]
+            
+            # Build dynamic concentration metrics from analyzer results
+            concentration_metrics = {}
+            for threshold_key, metric_data in concentration.items():
+                concentration_metrics[threshold_key] = convert_concentration_metric(metric_data)
+            
             period_result = {
                 "period": period_key,
                 "total": period_data.get("total_value", 0),
-                "top_10": convert_concentration_metric(concentration.get("top_10")),
-                "top_20": convert_concentration_metric(concentration.get("top_20")),
-                "top_50": convert_concentration_metric(concentration.get("top_50")),
-                "head": [],  # Not populated in this version
+                "concentration": concentration_metrics,
+                "head": head_sample,
             }
 
             if period_key == "TOTAL" or period_key == "ALL":
@@ -385,7 +430,7 @@ async def analyze_concentration(
                     "period": period_key,
                     "total_entities": period_data.get("total_entities", 0),
                     "total_value": period_data.get("total_value", 0),
-                    "concentration": concentration,
+                    "concentration": concentration_metrics,
                 }
             else:
                 by_period.append(period_result)
@@ -404,9 +449,9 @@ async def analyze_concentration(
             by_period=by_period,
             totals=totals,
             export_links={
-                "csv": f"/api/v1/download/{dataset_id}/concentration.csv",
-                "xlsx": f"/api/v1/download/{dataset_id}/concentration.xlsx",
-            },
+                format_type: f"/api/v1/download/{dataset_id}/concentration.{format_type}"
+                for format_type in export_paths.keys()
+            } if export_paths else None,
         )
 
     except HTTPException:
@@ -453,6 +498,10 @@ async def download_concentration_csv(
             )
 
         # Read CSV content so we can append dimension metadata for POC UX
+        # TODO: TECH DEBT - Replace post-append metadata with proper CSV structure
+        # Current: Appends "GroupBy,{value}" line after CSV data  
+        # Better: Add metadata as proper CSV columns or separate metadata.csv file
+        # Tracked in: docs/tech_debt.md
         try:
             with open(csv_path, "r", encoding="utf-8") as f:
                 content = f.read()
