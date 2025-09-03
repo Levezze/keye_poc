@@ -3,9 +3,10 @@ Concentration Analysis Module
 """
 
 import pandas as pd
-import numpy as np
 from typing import Dict, Any, List, Optional, Tuple, cast
 from dataclasses import dataclass
+import time
+from config.settings import settings
 
 
 @dataclass
@@ -70,6 +71,9 @@ class ConcentrationAnalyzer:
         """
         if thresholds is None:
             thresholds = [10, 20, 50]
+        
+        # Sort and deduplicate thresholds to ensure deterministic processing
+        thresholds = sorted(set(thresholds))
 
         parameters = {
             "group_by": group_by,
@@ -82,6 +86,9 @@ class ConcentrationAnalyzer:
 
         computation_log = []
         results = {}
+        
+        # Start timing if enabled
+        start_time = time.perf_counter() if settings.analysis_timing else None
 
         try:
             if period_key_column and period_key_column in df.columns:
@@ -100,6 +107,17 @@ class ConcentrationAnalyzer:
 
             # Add summary statistics
             results["summary"] = self._generate_summary(results, parameters)
+            
+            # Add timing metrics if enabled
+            if settings.analysis_timing and start_time is not None:
+                analysis_time = time.perf_counter() - start_time
+                results["summary"]["analysis_time_seconds"] = round(analysis_time, 3)
+                computation_log.append({
+                    "step": "timing",
+                    "status": "completed", 
+                    "analysis_time_seconds": round(analysis_time, 3)
+                })
+            
             computation_log.append(
                 {
                     "step": "summary_generation",
@@ -182,19 +200,31 @@ class ConcentrationAnalyzer:
         # Group and aggregate
         try:
             grouped = df.groupby(group_by)[value_col].sum().reset_index()
+            entity_count = len(grouped)
             logs.append(
                 {
                     "step": f"aggregation_{period_name}",
                     "status": "completed",
-                    "entities_count": len(grouped),
+                    "entities_count": entity_count,
                     "total_value": float(grouped[value_col].sum()),
                 }
             )
+            
+            # Add performance warning for large datasets
+            if entity_count > settings.large_dataset_entity_threshold:
+                logs.append({
+                    "step": f"performance_warning_{period_name}",
+                    "status": "warning",
+                    "period": period_name,
+                    "message": f"Large dataset detected: {entity_count} entities (>{settings.large_dataset_entity_threshold} threshold)",
+                    "entities_count": entity_count
+                })
         except Exception as e:
             logs.append(
                 {
                     "step": f"aggregation_{period_name}",
                     "status": "failed",
+                    "period": period_name,
                     "error": str(e),
                 }
             )
@@ -250,15 +280,13 @@ class ConcentrationAnalyzer:
                 ],  # Top 10 for display
             }
 
-        # Add head sample for display
-        head_sample = grouped_sorted.head(min(20, len(grouped_sorted))).to_dict(
-            "records"
-        )
-        for record in head_sample:
-            # Convert numpy types to native Python types for JSON serialization
-            for key, value in record.items():
-                if isinstance(value, (np.integer, np.floating)):
-                    record[key] = float(value)
+        # Add head sample for display (vectorized conversion for performance)
+        head_df = grouped_sorted.head(min(20, len(grouped_sorted))).copy()
+        # Vectorized conversion of numeric columns to float for JSON serialization
+        for col in head_df.columns:
+            if pd.api.types.is_numeric_dtype(head_df[col]):
+                head_df[col] = head_df[col].astype(float)
+        head_sample = head_df.to_dict("records")
 
         result = {
             "period": period_name,

@@ -48,6 +48,10 @@ class Settings(BaseSettings):
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     ]
 
+    # Performance Settings
+    analysis_timing: bool = False
+    large_dataset_entity_threshold: int = 10000
+
     # Time Detection Settings
     year_range: tuple[int, int] = (1900, 2100)
     max_null_rate: float = 0.4
