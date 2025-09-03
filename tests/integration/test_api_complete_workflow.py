@@ -358,7 +358,9 @@ class TestCompleteAPIWorkflow:
         )
 
         assert analysis_response.status_code == 400
-        assert "not found in dataset" in analysis_response.json()["detail"]
+        response_data = analysis_response.json()
+        assert "not found in dataset" in response_data["message"]
+        assert response_data["error"] == "ValidationError"
 
     @pytest.mark.skipif(not settings.api_key, reason="API key not configured")
     def test_api_key_validation(self):

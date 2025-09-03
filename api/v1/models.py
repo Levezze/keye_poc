@@ -3,8 +3,21 @@ API v1 Pydantic Models
 """
 
 from pydantic import BaseModel, Field, field_validator
-from typing import Literal, Optional, List, Dict, Any
+from typing import Literal, Optional, List, Dict, Any, Union
 from datetime import datetime
+import uuid
+
+
+class ErrorResponse(BaseModel):
+    """Standardized error response envelope."""
+    
+    error: Literal[
+        "ValidationError", "NotFound", "Conflict", "RateLimited", 
+        "PayloadTooLarge", "InternalError", "Unauthorized"
+    ] = Field(description="Error type")
+    message: str = Field(description="Human-readable error message")
+    details: Optional[Dict[str, Any]] = Field(default=None, description="Additional error details")
+    request_id: Optional[str] = Field(default=None, description="Request ID for tracking")
 
 
 class UploadResponse(BaseModel):
