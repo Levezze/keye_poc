@@ -207,7 +207,15 @@ CRITICAL REQUIREMENTS:
 2. Reference specific numbers from the provided analysis results
 3. Focus on actionable business implications
 4. Keep insights concise and decision-focused
-5. Output MUST be valid JSON matching the NarrativeInsights schema exactly
+5. Output MUST be valid JSON with this EXACT structure (no wrapper objects):
+{
+  "executive_summary": "string - brief overview for executives",
+  "key_findings": ["list of specific findings from data"],
+  "risk_indicators": ["list of identified risks"],  
+  "opportunities": ["list of business opportunities"],
+  "recommendations": ["list of actionable recommendations"],
+  "confidence_notes": ["optional notes about confidence level"]
+}
 6. NO prose or explanation outside the JSON response
 
 Create insights that help executives understand:
@@ -216,14 +224,19 @@ Create insights that help executives understand:
 - Growth opportunities identified in the data
 - Specific, actionable recommendations
 
-Output valid JSON only.""",
+Output ONLY the JSON object directly - no wrapper, no schema name.""",
     "risk_flags": """You are a risk assessment specialist. Evaluate concentration risk using provided metrics only.
 
 CRITICAL REQUIREMENTS:
 1. Use ONLY the concentration percentages provided - no new calculations
 2. Classify risk as low/medium/high based on common industry thresholds
 3. Provide 1-3 specific reasons citing the provided data
-4. Output MUST be valid JSON matching the RiskFlags schema exactly  
+4. Output MUST be valid JSON with this EXACT structure (no wrapper objects):
+{
+  "level": "low|medium|high",
+  "reasons": ["list of specific reasons citing data"],
+  "score": null
+}
 5. NO prose or explanation outside the JSON response
 
 Risk level guidelines:
@@ -231,7 +244,7 @@ Risk level guidelines:
 - MEDIUM: Top 10% 60-80%, concentrated but manageable
 - LOW: Top 10% < 60%, well-distributed
 
-Output valid JSON only.""",
+Output ONLY the JSON object directly - no wrapper, no schema name.""",
     "data_quality_report": """You are a data quality specialist. Assess data quality based on provided schema warnings and statistics.
 
 CRITICAL REQUIREMENTS:
@@ -254,7 +267,11 @@ CRITICAL REQUIREMENTS:
 1. Use ONLY the concentration results provided - no new calculations
 2. Suggest 1-5 threshold percentages based on observed patterns
 3. Provide clear rationale tied to the specific data characteristics
-4. Output MUST be valid JSON matching the ThresholdRecommendations schema exactly
+4. Output MUST be valid JSON with this EXACT structure (no wrapper objects):
+{
+  "suggested": [10, 20, 50],
+  "rationale": "string explaining the reasoning (max 250 characters)"
+}
 5. NO prose or explanation outside the JSON response
 
 Consider:
@@ -262,7 +279,7 @@ Consider:
 - Industry standards for concentration analysis
 - Practical business decision-making needs
 
-Output valid JSON only.""",
+Output ONLY the JSON object directly - no wrapper, no schema name.""",
     "qa_over_context": """You are a data analyst assistant. Answer user questions using ONLY the provided context data.
 
 CRITICAL REQUIREMENTS:
