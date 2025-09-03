@@ -1,124 +1,205 @@
-# Technical Debt Register
+# Technical Debt Register - Keye POC
 
-Purpose: Track intentional deferrals and polish items by branch. Each item lists a short rationale and a small checklist to clear at the end.
+This document tracks technical debt items organized by priority and branch. Each item includes rationale, effort estimates, and actionable checklists.
 
-## feature/registry-and-storage
+## Current Active Debt (By Priority)
 
-- Debt: Timestamps use naive ISO strings in some places
-  - Reason: Avoid test churn while migrating away from `utcnow()`
-  - Checklist:
-    - [ ] Migrate to `datetime.now(timezone.utc)` and emit `Z`
-    - [ ] Update tests to parse timestamps instead of string equals
+### High Priority
 
-- Debt: No path canonicalization helpers in API (ID format validation added)
-  - Reason: ID regex already constrains inputs; canonicalization is belt-and-suspenders
-  - Checklist:
-    - [ ] Add `_safe_dataset_path` that enforces paths within `datasets_path`
-    - [ ] Replace direct joins in routes with helper
+*No high priority technical debt items currently identified*
 
-- Debt: No listing/indexing endpoint for datasets
-  - Reason: POC scope keeps FS as source of truth; list not required
-  - Checklist:
-    - [ ] Optional: add lightweight index or listing API
+### Medium Priority
 
-## feature/normalization-and-schema
+#### CSV Metadata Export Format
+**Current Implementation:**
+- CSV exports append metadata as trailing line: `GroupBy,{value}`
+- Breaks standard CSV format and may confuse parsers
 
-- Debt: Precompiled regexes exist; consider extracting to constants module
-  - Reason: Readability and reuse across modules
-  - Checklist:
-    - [ ] Move shared patterns to `core/deterministic/patterns.py`
-    - [ ] Import in normalization/time modules
+**Location:** `api/v1/routes.py` (concentration CSV download)
 
-- Debt: Ambiguous date detection warnings could be richer
-  - Reason: Current behavior is deterministic; deeper heuristics are optional
-  - Checklist:
-    - [ ] Add explicit "ambiguous day/month" counter when mixed formats detected
+**Issues:**
+- Non-standard CSV format (metadata mixed with data)
+- Potential parsing issues in spreadsheet applications
+- Inconsistent with proper CSV structure
 
-## feature/time-and-periods
+**Proposed Solutions:**
+1. **Option A: Metadata Columns** (Recommended for v1.1)
+   - Add `group_by`, `value_column`, `analysis_date` columns to each row
+   - Standard CSV format, self-documenting
+   - Backwards compatible if we also keep the trailing line for one release
+2. **Option B: Separate Metadata File** (Recommended for v2.0)
+   - Generate `concentration_metadata.json` alongside `concentration.csv`
+   - Clean separation of data and metadata
+3. **Option C: CSV Header Comments**
+   - Prepend `# GroupBy: entity`-style comments on first lines
+   - Supported by some CSV consumers but not all
 
-- Debt: No fiscal calendar support
-  - Reason: Out of scope for POC; calendar vs fiscal distinction documented as limitation
-  - Checklist:
-    - [ ] Document override hooks for fiscal mapping
-    - [ ] Add fiscal year start month configuration
+**Migration Path:**
+- Phase 1: Add proper columns while maintaining current append for BC
+- Phase 2: Remove append behavior and document breaking change
+- Phase 3: Consider metadata file approach for complex scenarios
 
-- Debt: `period_key` head sample not surfaced in API responses
-  - Reason: Keep payloads small for POC
-  - Checklist:
-    - [ ] Consider adding compact head sample for debugging
+**Effort Estimate:** 2-3 hours for Option A, 4-5 hours for Option B
+**Risk:** Low - affects CSV export format only
 
-- Debt: `selected_time_columns` and `derivations` not exposed in API schema
-  - Reason: Internal metadata kept minimal for POC; main use case covered by period_grain/candidates
-  - Checklist:
-    - [ ] Add selected_time_columns to schema response if debugging needs arise
-    - [ ] Document derivation logic for manual override scenarios
+#### Path Canonicalization
+**Current Implementation:**
+- Direct path joins without canonicalization helpers
+- ID regex validation provides basic protection
 
-- Debt: No manual time column override mechanism  
-  - Reason: POC focuses on automatic detection; precedence rules handle most cases
-  - Checklist:
-    - [ ] Add optional time_column_hints parameter to normalization API
-    - [ ] Allow explicit period_grain selection to override detection
+**Issues:**
+- No centralized path safety validation
+- Potential security risk if regex validation insufficient
 
-- Debt: Time warnings bundled with general warnings
-  - Reason: Simplified for POC; existing warnings array handles all cases
-  - Checklist:
-    - [ ] Consider separate time_warnings field for better UX categorization
+**Solution:**
+- Add `_safe_dataset_path` helper that enforces paths within `datasets_path`
+- Replace direct joins in routes with helper
 
-## feature/concentration-analysis
+**Effort Estimate:** 2-3 hours
+**Risk:** Medium - security related
 
-- Debt: Export formulas placeholder
-  - Reason: Formulas are nice for audit but not required
-  - Checklist:
-    - [ ] Implement basic Excel formulas in Summary sheet
+### Low Priority
 
-- Debt: No performance benchmarks
+#### Export Payload Size Management
+**Issue:** API responses include full head samples which could grow large
+**Solution:** Implement pagination or configurable limits
+**Current Mitigation:** 10-item limit is reasonable for POC
+
+#### Performance Optimization for Large Datasets
+**Issue:** 10k entity limit may not be sufficient for enterprise use
+**Solution:** Implement streaming or chunked processing
+**Current Mitigation:** Performance adequate for expected POC use
+
+#### Error Message Localization
+**Issue:** All error messages are in English
+**Solution:** Implement i18n framework
+**Current Mitigation:** English sufficient for POC
+
+## Debt by Feature Branch
+
+### feature/registry-and-storage
+
+- **Timestamps use naive ISO strings**
+  - Reason: Avoid test churn while migrating from `utcnow()`
+  - [ ] Migrate to `datetime.now(timezone.utc)` and emit `Z`
+  - [ ] Update tests to parse timestamps instead of string equals
+
+- **No listing/indexing endpoint for datasets**
+  - Reason: POC scope keeps FS as source of truth
+  - [ ] Optional: add lightweight index or listing API
+
+### feature/normalization-and-schema
+
+- **Precompiled regexes scattered across modules**
+  - Reason: Readability and reuse optimization
+  - [ ] Move shared patterns to `core/deterministic/patterns.py`
+  - [ ] Import in normalization/time modules
+
+- **Ambiguous date detection warnings could be richer**
+  - Reason: Current behavior is deterministic; deeper heuristics optional
+  - [ ] Add explicit "ambiguous day/month" counter when mixed formats detected
+
+### feature/time-and-periods
+
+- **No fiscal calendar support**
+  - Reason: Out of scope for POC
+  - [ ] Document override hooks for fiscal mapping
+  - [ ] Add fiscal year start month configuration
+
+- **`selected_time_columns` and `derivations` not exposed in API schema**
+  - Reason: Internal metadata kept minimal for POC
+  - [ ] Add selected_time_columns to schema response if debugging needs arise
+  - [ ] Document derivation logic for manual override scenarios
+
+- **No manual time column override mechanism**
+  - Reason: POC focuses on automatic detection
+  - [ ] Add optional time_column_hints parameter to normalization API
+  - [ ] Allow explicit period_grain selection to override detection
+
+- **Time warnings bundled with general warnings**
+  - Reason: Simplified for POC
+  - [ ] Consider separate time_warnings field for better UX categorization
+
+### feature/concentration-analysis
+
+- **Export formulas placeholder**
+  - Reason: Formulas nice for audit but not required for POC
+  - [ ] Implement basic Excel formulas in Summary sheet
+
+- **No performance benchmarks**
   - Reason: POC data sizes are small
-  - Checklist:
-    - [ ] Add simple benchmark fixture for N=100k rows
+  - [ ] Add simple benchmark fixture for N=100k rows
 
-## feature/api-v1
+### feature/api-v1
 
-- Debt: Dataset ID path canonicalization (validation added)
-  - Reason: Regex validation covers primary risk
-  - Checklist:
-    - [ ] Add `_safe_dataset_path` and switch all path joins
-
-- Debt: Rate limiting and timeouts
+- **Rate limiting and timeouts**
   - Reason: Non-essential for POC
-  - Checklist:
-    - [ ] Add simple rate limit (proxy or middleware) and request timeout
+  - [ ] Add simple rate limit (proxy or middleware) and request timeout
 
-- Debt: Error model standardization
-  - Reason: Kept minimal for speed
-  - Checklist:
-    - [ ] Add shared error responses with codes
+- **Error model standardization**
+  - Reason: Kept minimal for development speed
+  - [ ] Add shared error responses with codes
 
-## feature/llm-adapters (optional)
+### feature/llm-adapters (optional)
 
-- Debt: Insights are basic, schema notes minimal
+- **Insights are basic, schema notes minimal**
   - Reason: Advisory only; core math is deterministic
-  - Checklist:
-    - [ ] Persist richer context; add redact/scrub as needed
+  - [ ] Persist richer context; add redact/scrub as needed
 
-## chore/docker-and-docs
+### chore/docker-and-docs
 
-- Debt: docs/api.md is a stub
+- **docs/api.md is a stub**
   - Reason: Time-boxed; Postman/pytest cover examples
-  - Checklist:
-    - [ ] Fill `docs/api.md` with curl examples and response shapes
+  - [ ] Fill `docs/api.md` with curl examples and response shapes
 
-- Debt: Security hardening only partial
-  - Reason: POC; added API key and basic checks
-  - Checklist:
-    - [ ] Add dataset ID path canonicalization
-    - [ ] Consider rate limiting note in docs
+- **Security hardening only partial**
+  - Reason: POC scope; added API key and basic checks
+  - [ ] Add dataset ID path canonicalization
+  - [ ] Consider rate limiting note in docs
+
+## Resolved Technical Debt
+
+### ✅ Custom Thresholds Bug (Resolved v1.0)
+- **Issue:** Custom thresholds silently dropped due to hard-coded API models
+- **Solution:** Dynamic threshold support with `Dict[str, ConcentrationMetrics]`
+- **Resolved:** Complete custom threshold pipeline implementation
+
+### ✅ Pydantic Mutable Defaults (Resolved v1.0)
+- **Issue:** Mutable defaults causing state leakage between requests
+- **Solution:** `Field(default_factory=...)` pattern throughout codebase
+- **Resolved:** All mutable defaults fixed
+
+### ✅ Export Formatting (Resolved v1.0)
+- **Issue:** Basic export formats without head samples
+- **Solution:** Structured CSV sections, Excel Top_Entities sheet, head sample integration
+- **Resolved:** Enhanced export formatting with proper data surfacing
+
+### ✅ Input Validation (Resolved v1.0)
+- **Issue:** Insufficient API request validation
+- **Solution:** Comprehensive field validation with proper error messages
+- **Resolved:** Robust validation for thresholds, field requirements
+
+### ✅ Period Label Inconsistency (Resolved v1.0)
+- **Issue:** Mix of "ALL" vs "TOTAL" across single/multi-period analysis
+- **Solution:** Standardized on "TOTAL" with backwards compatibility
+- **Resolved:** Consistent period labeling verified
+
+### ✅ Error Message Standardization (Resolved v1.0)
+- **Issue:** Inconsistent error messages for edge cases
+- **Solution:** Standardized error messages with proper handling
+- **Resolved:** "Total value is non-positive; cannot compute concentration" pattern
+
+## Global Follow-ups
+
+Priority order for addressing remaining debt:
+
+1. **Path Canonicalization** (Medium) - Security related
+2. **CSV Metadata Export** (Medium) - Standards compliance  
+3. **Timestamp Migration** (Low) - Code quality
+4. **Performance Benchmarking** (Low) - Future-proofing
+5. **Documentation Completion** (Low) - User experience
 
 ---
 
-Global follow-ups
-
-- [ ] Replace utcnow() usage with timezone-aware now + `Z`
-- [ ] Add `_safe_dataset_path` helper and adopt across routes
-- [ ] Light rate limiting and request timeouts (documented defaults)
-- [ ] Performance benchmark note for large files (streaming/async path)
-
+*Last Updated: 2025-01-03*
+*Next Review: When starting new feature branches*
