@@ -28,23 +28,41 @@ class ExportService:
         # Convert results to DataFrame format
         rows = []
 
-        if "by_period" in results:
+        if "by_period" in results and len(results["by_period"]) > 0:
             for period_data in results["by_period"]:
                 period = period_data["period"]
-                for threshold in ["top_10", "top_20", "top_50"]:
-                    # Only include thresholds that have real metrics (skip None)
-                    if threshold in period_data:
-                        metrics = period_data[threshold]
-                        if isinstance(metrics, dict):
-                            rows.append(
-                                {
-                                    "period": period,
-                                    "threshold": threshold.replace("top_", ""),
-                                    "count": metrics.get("count", 0),
-                                    "value": metrics.get("value", 0),
-                                    "pct_of_total": round(metrics.get("pct_of_total", 0), 1),
-                                }
-                            )
+                # Get concentration data and iterate over actual thresholds
+                concentration = period_data.get("concentration", {})
+                for threshold_key, metrics in concentration.items():
+                    if isinstance(metrics, dict):
+                        # Extract threshold number from key (e.g., "top_10" -> "10")
+                        threshold_display = threshold_key.replace("top_", "")
+                        rows.append(
+                            {
+                                "period": period,
+                                "threshold": threshold_display,
+                                "count": metrics.get("count", 0),
+                                "value": metrics.get("value", 0),
+                                "pct_of_total": round(metrics.get("percentage", 0), 1),
+                            }
+                        )
+        elif "totals" in results:
+            # Handle single-period case (no time dimension)
+            totals_data = results["totals"]
+            concentration = totals_data.get("concentration", {})
+            for threshold_key, metrics in concentration.items():
+                if isinstance(metrics, dict):
+                    # Extract threshold number from key (e.g., "top_10" -> "10")
+                    threshold_display = threshold_key.replace("top_", "")
+                    rows.append(
+                        {
+                            "period": "TOTAL",
+                            "threshold": threshold_display,
+                            "count": metrics.get("count", 0),
+                            "value": metrics.get("value", 0),
+                            "pct_of_total": round(metrics.get("percentage", 0), 1),
+                        }
+                    )
 
         df = pd.DataFrame(rows)
         return StorageService.write_csv(df, output_path)
@@ -68,17 +86,28 @@ class ExportService:
 
         # Summary sheet
         summary_rows = []
-        if "by_period" in results:
+        if "by_period" in results and len(results["by_period"]) > 0:
             for period_data in results["by_period"]:
                 row = {"period": period_data["period"], "total": period_data["total"]}
-                for threshold in ["top_10", "top_20", "top_50"]:
-                    if threshold in period_data:
-                        metrics = period_data[threshold]
-                        if isinstance(metrics, dict):
-                            row[f"{threshold}_count"] = metrics.get("count", 0)
-                            row[f"{threshold}_value"] = metrics.get("value", 0)
-                            row[f"{threshold}_pct"] = round(metrics.get("pct_of_total", 0), 1)
+                # Get concentration data and iterate over actual thresholds
+                concentration = period_data.get("concentration", {})
+                for threshold_key, metrics in concentration.items():
+                    if isinstance(metrics, dict):
+                        row[f"{threshold_key}_count"] = metrics.get("count", 0)
+                        row[f"{threshold_key}_value"] = metrics.get("value", 0)
+                        row[f"{threshold_key}_pct"] = round(metrics.get("percentage", 0), 1)
                 summary_rows.append(row)
+        elif "totals" in results:
+            # Handle single-period case (no time dimension)
+            totals_data = results["totals"]
+            row = {"period": "TOTAL", "total": totals_data.get("total", 0)}
+            concentration = totals_data.get("concentration", {})
+            for threshold_key, metrics in concentration.items():
+                if isinstance(metrics, dict):
+                    row[f"{threshold_key}_count"] = metrics.get("count", 0)
+                    row[f"{threshold_key}_value"] = metrics.get("value", 0)
+                    row[f"{threshold_key}_pct"] = round(metrics.get("pct_of_total", 0), 1)
+            summary_rows.append(row)
 
         if summary_rows:
             sheets["Summary"] = pd.DataFrame(summary_rows)

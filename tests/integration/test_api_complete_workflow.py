@@ -129,6 +129,17 @@ class TestCompleteAPIWorkflow:
         assert "by_period" in analysis_data
         assert "totals" in analysis_data
         assert "export_links" in analysis_data
+        
+        # Verify custom thresholds appear in response structure
+        by_period = analysis_data["by_period"]
+        if by_period:
+            first_period = by_period[0]
+            concentration = first_period.get("concentration", {})
+            assert "top_50" in concentration
+            assert "top_75" in concentration
+            # Should NOT contain default thresholds
+            assert "top_10" not in concentration
+            assert "top_20" not in concentration
 
         # Verify export links
         export_links = analysis_data["export_links"]
@@ -146,10 +157,14 @@ class TestCompleteAPIWorkflow:
             csv_download_response.headers["content-type"] == "text/csv; charset=utf-8"
         )
 
-        # Verify CSV content is not empty
+        # Verify CSV content is not empty and contains custom thresholds
         csv_content = csv_download_response.content.decode("utf-8")
         assert len(csv_content) > 0
         assert "entity" in csv_content  # Should contain the group_by column
+        assert "50" in csv_content  # Should contain custom threshold 50
+        assert "75" in csv_content  # Should contain custom threshold 75
+        # Should NOT contain default thresholds
+        assert "10," not in csv_content and "20," not in csv_content
 
         # Step 5: Download Excel export
         xlsx_download_response = self.client.get(
@@ -342,3 +357,94 @@ class TestCompleteAPIWorkflow:
         )
 
         assert response.status_code == 401
+    
+    def test_custom_thresholds_comprehensive(self):
+        """Comprehensive test for custom threshold functionality end-to-end."""
+        # Create test data with clear concentration pattern
+        data = {
+            "entity": ["A", "B", "C", "D", "E", "F", "G", "H"],
+            "value": [1000, 500, 300, 200, 100, 50, 25, 10]  # Clear concentration hierarchy
+        }
+        df = pd.DataFrame(data)
+        csv_content = df.to_csv(index=False).encode("utf-8")
+        
+        # Upload
+        upload_response = self.client.post(
+            "/api/v1/upload",
+            files={"file": ("concentration_test.csv", csv_content, "text/csv")},
+            headers=self.headers,
+        )
+        
+        assert upload_response.status_code == 200
+        dataset_id = upload_response.json()["dataset_id"]
+        
+        # Test multiple different custom threshold sets
+        test_cases = [
+            {"thresholds": [5, 25, 75], "name": "low_medium_high"},
+            {"thresholds": [1, 99], "name": "extreme_ends"},
+            {"thresholds": [30, 60, 90], "name": "medium_increments"},
+        ]
+        
+        for case in test_cases:
+            # Run concentration analysis with custom thresholds
+            concentration_request = {
+                "group_by": "entity",
+                "value": "value",
+                "thresholds": case["thresholds"]
+            }
+            
+            analysis_response = self.client.post(
+                f"/api/v1/analyze/{dataset_id}/concentration",
+                json=concentration_request,
+                headers=self.headers,
+            )
+            
+            assert analysis_response.status_code == 200
+            analysis_data = analysis_response.json()
+            
+            # Validate that custom thresholds are reflected in response
+            assert analysis_data["thresholds"] == case["thresholds"]
+            
+            # Verify totals section contains custom threshold keys
+            totals = analysis_data["totals"]
+            concentration = totals.get("concentration", {})
+            
+            for threshold in case["thresholds"]:
+                expected_key = f"top_{threshold}"
+                assert expected_key in concentration, f"Missing {expected_key} in {case['name']}"
+                
+                # Validate structure of each threshold
+                threshold_data = concentration[expected_key]
+                assert "count" in threshold_data
+                assert "value" in threshold_data
+                assert "percentage" in threshold_data
+                assert isinstance(threshold_data["count"], int)
+                assert isinstance(threshold_data["value"], float)
+                assert isinstance(threshold_data["percentage"], float)
+            
+            # Ensure default thresholds are NOT present
+            default_keys = ["top_10", "top_20", "top_50"]
+            for key in default_keys:
+                if key not in [f"top_{t}" for t in case["thresholds"]]:
+                    assert key not in concentration, f"Unexpected default {key} in {case['name']}"
+            
+            # Test CSV export contains custom thresholds
+            export_links = analysis_data["export_links"]
+            csv_download_response = self.client.get(
+                export_links["csv"], headers=self.headers
+            )
+            
+            assert csv_download_response.status_code == 200
+            csv_content = csv_download_response.content.decode("utf-8")
+            
+            # Verify CSV contains custom threshold values
+            for threshold in case["thresholds"]:
+                assert str(threshold) in csv_content, f"Missing threshold {threshold} in CSV for {case['name']}"
+            
+            # Verify CSV does NOT contain unused default thresholds
+            unused_defaults = [10, 20, 50]
+            for default_threshold in unused_defaults:
+                if default_threshold not in case["thresholds"]:
+                    # Be careful not to match substrings (e.g., "10" in "100")
+                    assert f",{default_threshold}," not in csv_content and f"\n{default_threshold}," not in csv_content, \
+                        f"Unexpected default threshold {default_threshold} in CSV for {case['name']}"

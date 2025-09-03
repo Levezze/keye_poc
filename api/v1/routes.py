@@ -312,15 +312,12 @@ async def analyze_concentration(
             if period_key == "summary":
                 continue
             concentration = period_data.get("concentration", {})
-            export_data["by_period"].append(
-                {
-                    "period": period_key,
-                    "total": period_data.get("total_value", 0),
-                    "top_10": concentration.get("top_10") if concentration else None,
-                    "top_20": concentration.get("top_20") if concentration else None,
-                    "top_50": concentration.get("top_50") if concentration else None,
-                }
-            )
+            period_export = {
+                "period": period_key,
+                "total": period_data.get("total_value", 0),
+                "concentration": concentration,
+            }
+            export_data["by_period"].append(period_export)
             
             # Add head sample to details (limit to 10 items per period)
             head_sample = period_data.get("head_sample", [])[:10]
@@ -329,6 +326,14 @@ async def analyze_concentration(
                 detail_item["period"] = period_key
                 export_data["details"].append(detail_item)
 
+        # Add totals data for single-period export fallback
+        if "TOTAL" in analysis_result.data:
+            totals_data = analysis_result.data["TOTAL"]
+            export_data["totals"] = {
+                "total": totals_data.get("total_value", 0),
+                "concentration": totals_data.get("concentration", {}),
+            }
+        
         # Add export metadata
         export_data.update({
             "group_by": request.group_by,
@@ -389,12 +394,15 @@ async def analyze_concentration(
             # Get head sample (limit to 10 items for API payload size)
             head_sample = period_data.get("head_sample", [])[:10]
             
+            # Build dynamic concentration metrics from analyzer results
+            concentration_metrics = {}
+            for threshold_key, metric_data in concentration.items():
+                concentration_metrics[threshold_key] = convert_concentration_metric(metric_data)
+            
             period_result = {
                 "period": period_key,
                 "total": period_data.get("total_value", 0),
-                "top_10": convert_concentration_metric(concentration.get("top_10")),
-                "top_20": convert_concentration_metric(concentration.get("top_20")),
-                "top_50": convert_concentration_metric(concentration.get("top_50")),
+                "concentration": concentration_metrics,
                 "head": head_sample,
             }
 
