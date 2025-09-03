@@ -24,6 +24,63 @@ This document tracks technical debt items organized by priority and branch. Each
 - Consider v1.1 announcement for enhanced threshold features
 - Plan deprecation timeline for any breaking changes
 
+### Minor Issues
+
+#### Performance Scalability for Large Datasets
+**Location:** `core/deterministic/concentration.py:214-221`
+
+**Current Implementation:**
+- Large dataset warnings trigger at >10k entities (configurable threshold)
+- Warning logged but processing continues with full in-memory operations
+
+**Issue:**
+- Performance consideration: warnings are helpful, but consider implementing actual pagination or chunking for datasets >10k entities
+
+**Proposed Solution:**
+- Implement streaming/chunked processing for very large datasets
+- Consider processing in batches for memory efficiency
+- Add optional pagination for head samples in API responses
+
+#### Memory Efficiency in Head Sample Processing
+**Location:** `core/deterministic/concentration.py:258-263`
+
+**Current Implementation:**
+```python
+head_df = grouped_sorted.head(min(20, len(grouped_sorted))).copy()
+# Vectorized conversion of numeric columns to float for JSON serialization
+for col in head_df.columns:
+    if pd.api.types.is_numeric_dtype(head_df[col]):
+        head_df[col] = head_df[col].astype(float)
+head_sample = head_df.to_dict("records")
+```
+
+**Issue:**
+- The head sample limits to 20 items but converts entire DataFrame copy
+- Memory inefficient for large datasets
+
+**Proposed Solution:**
+```python
+# Consider direct conversion of limited rows without full DataFrame copy
+# Process only the subset needed for head sample
+```
+
+#### Export Error User Feedback
+**Location:** `api/v1/routes.py:355-365`
+
+**Current Implementation:**
+- Export failures are logged to computation log
+- API continues without export files
+- Users don't receive clear indication of export issues
+
+**Issue:**
+- Export failures are logged but don't surface clearly to the user
+- Response shows `export_links: null` without explanation
+
+**Proposed Solution:**
+- Add warning in API response when exports fail
+- Include export failure details in `warnings` array
+- Consider partial success responses (e.g., CSV succeeded but Excel failed)
+
 ### Medium Priority
 
 #### CSV Metadata Export Format
