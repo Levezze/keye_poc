@@ -21,12 +21,17 @@ class Settings(BaseSettings):
 
     # LLM Settings
     use_llm: bool = True
-    llm_provider: Optional[str] = "openai"  # openai, anthropic, etc.
+    llm_provider: Optional[str] = "openai"  # openai, anthropic, gemini
     openai_api_key: Optional[str] = None
     anthropic_api_key: Optional[str] = None
-    llm_model: Optional[str] = "gpt-4o-mini"
+    google_api_key: Optional[str] = None
+    llm_model: Optional[str] = "gpt-4.1-mini"  # Updated from gpt-4o-mini for consistency
     llm_temperature: float = 0.3
     llm_max_tokens: int = 2000
+    llm_timeout: int = 30  # Request timeout in seconds
+    llm_max_retries: int = 2  # Max retries for transient errors
+    llm_cache_ttl: int = 86400  # Cache TTL in seconds (24 hours)
+    llm_max_calls_per_dataset: int = 10  # Cost control per dataset
 
     # Security / API
     allowed_origins: list[str] = [
