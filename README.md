@@ -64,20 +64,25 @@ Once running, visit:
 ### Example Usage
 
 ```bash
-# Upload a file
+# Upload a file with request tracking
 curl -X POST "http://localhost:8000/api/v1/upload" \
   -H "accept: application/json" \
   -H "Content-Type: multipart/form-data" \
+  -H "X-Request-ID: upload-001" \
+  -H "X-API-Key: dev-key" \
   -F "file=@sample_data.xlsx"
 
 # Response: {"dataset_id": "ds_abc123..."}
 
 # Get schema
-curl "http://localhost:8000/api/v1/schema/ds_abc123"
+curl "http://localhost:8000/api/v1/schema/ds_abc123" \
+  -H "X-API-Key: dev-key"
 
 # Run concentration analysis (dynamic thresholds supported)
 curl -X POST "http://localhost:8000/api/v1/analyze/ds_abc123/concentration" \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: dev-key" \
+  -H "X-Request-ID: analyze-001" \
   -d '{
     "group_by": "customer",
     "value": "revenue",
@@ -85,11 +90,20 @@ curl -X POST "http://localhost:8000/api/v1/analyze/ds_abc123/concentration" \
   }'
 
 # Get insights
-curl "http://localhost:8000/api/v1/insights/ds_abc123"
+curl "http://localhost:8000/api/v1/insights/ds_abc123" \
+  -H "X-API-Key: dev-key"
+
+# Get audit trail
+curl "http://localhost:8000/api/v1/lineage/ds_abc123" \
+  -H "X-API-Key: dev-key"
 
 # Download results
 curl "http://localhost:8000/api/v1/download/ds_abc123/concentration.xlsx" \
+  -H "X-API-Key: dev-key" \
   --output results.xlsx
+
+# Check API health
+curl "http://localhost:8000/healthz"
 ```
 
 ## Architecture
