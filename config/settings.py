@@ -40,12 +40,12 @@ class Settings(BaseSettings):
 
     # Analysis Settings
     default_thresholds: list[int] = [10, 20, 50]
-    max_file_size_mb: int = 100
-    allowed_extensions: list[str] = [".xlsx", ".xls", ".csv"]
+    max_file_size_mb: int = 25  # Updated to 25MB as per enhanced requirements
+    allowed_extensions: list[str] = [".xlsx", ".csv"]  # Removed .xls for security
     allowed_mime_types: list[str] = [
         "text/csv",
-        "application/vnd.ms-excel",
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        # Removed legacy Excel MIME types for security
     ]
 
     # Performance Settings

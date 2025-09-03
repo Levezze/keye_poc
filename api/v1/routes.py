@@ -177,6 +177,7 @@ async def get_schema(dataset_id: str, x_api_key: Optional[str] = Header(default=
         Schema information including column types and metadata
     """
     _require_api_key(x_api_key)
+    _validate_dataset_id(dataset_id)
 
     registry = DatasetRegistry()
 
@@ -474,7 +475,7 @@ async def download_concentration_csv(
         CSV file download
     """
     _require_api_key(x_api_key)
-    # Accept any dataset_id here; return 404 if not found
+    _validate_dataset_id(dataset_id)
 
     registry = DatasetRegistry()
     storage = StorageService()
@@ -696,5 +697,30 @@ async def get_lineage(dataset_id: str, x_api_key: Optional[str] = Header(default
     """
     _require_api_key(x_api_key)
     _validate_dataset_id(dataset_id)
-    # TODO: Implement lineage retrieval
-    return {"dataset_id": dataset_id, "created_at": None, "steps": []}
+    
+    registry = DatasetRegistry()
+    
+    try:
+        # Check if dataset exists
+        try:
+            state = registry.get_dataset_state(dataset_id)
+        except DatasetNotFoundError as e:
+            raise HTTPException(
+                status_code=404, detail=str(e)
+            )
+        
+        # Get lineage data
+        lineage_data = registry.get_lineage(dataset_id)
+        if not lineage_data:
+            raise HTTPException(
+                status_code=404, detail=f"Lineage not found for dataset {dataset_id}"
+            )
+        
+        return lineage_data
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Error retrieving lineage: {str(e)}"
+        )
