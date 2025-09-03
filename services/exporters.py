@@ -64,8 +64,55 @@ class ExportService:
                         }
                     )
 
-        df = pd.DataFrame(rows)
-        return StorageService.write_csv(df, output_path)
+        # Create concentration metrics DataFrame
+        df_concentration = pd.DataFrame(rows)
+        
+        # If there are head samples, create a second section for top entities
+        all_data_sections = []
+        
+        if not df_concentration.empty:
+            # Add concentration metrics header
+            all_data_sections.extend([
+                "# CONCENTRATION METRICS",
+                df_concentration.to_csv(index=False)
+            ])
+        
+        # Add head samples section
+        head_sample_rows = []
+        if "by_period" in results and len(results["by_period"]) > 0:
+            for period_data in results["by_period"]:
+                period = period_data["period"]
+                head_sample = period_data.get("head_sample", [])
+                for i, entity in enumerate(head_sample[:5]):  # Top 5 for CSV brevity
+                    row = entity.copy()
+                    row["period"] = period
+                    row["rank"] = i + 1
+                    head_sample_rows.append(row)
+        elif "totals" in results:
+            totals_data = results["totals"]
+            head_sample = totals_data.get("head_sample", [])
+            for i, entity in enumerate(head_sample[:5]):
+                row = entity.copy()
+                row["period"] = "TOTAL"
+                row["rank"] = i + 1
+                head_sample_rows.append(row)
+        
+        if head_sample_rows:
+            df_head_sample = pd.DataFrame(head_sample_rows)
+            all_data_sections.extend([
+                "",  # Empty line separator
+                "# TOP ENTITIES", 
+                df_head_sample.to_csv(index=False)
+            ])
+        
+        # Combine all sections
+        final_csv_content = "\n".join(all_data_sections)
+        
+        # Write to file
+        with open(output_path, 'w') as f:
+            f.write(final_csv_content)
+        
+        return str(output_path)
 
     @staticmethod
     def export_concentration_excel(
@@ -106,7 +153,7 @@ class ExportService:
                 if isinstance(metrics, dict):
                     row[f"{threshold_key}_count"] = metrics.get("count", 0)
                     row[f"{threshold_key}_value"] = metrics.get("value", 0)
-                    row[f"{threshold_key}_pct"] = round(metrics.get("pct_of_total", 0), 1)
+                    row[f"{threshold_key}_pct"] = round(metrics.get("percentage", 0), 1)
             summary_rows.append(row)
 
         if summary_rows:
@@ -115,6 +162,30 @@ class ExportService:
         # Details sheet (if available)
         if "details" in results:
             sheets["Details"] = pd.DataFrame(results["details"])
+        
+        # Head samples sheet - show top entities for each period
+        head_sample_rows = []
+        if "by_period" in results and len(results["by_period"]) > 0:
+            for period_data in results["by_period"]:
+                period = period_data["period"]
+                head_sample = period_data.get("head_sample", [])
+                for i, entity in enumerate(head_sample[:10]):  # Limit to top 10 for readability
+                    row = entity.copy()
+                    row["period"] = period
+                    row["rank"] = i + 1
+                    head_sample_rows.append(row)
+        elif "totals" in results:
+            # Single period case
+            totals_data = results["totals"]
+            head_sample = totals_data.get("head_sample", [])
+            for i, entity in enumerate(head_sample[:10]):
+                row = entity.copy()
+                row["period"] = "TOTAL"
+                row["rank"] = i + 1
+                head_sample_rows.append(row)
+        
+        if head_sample_rows:
+            sheets["Top_Entities"] = pd.DataFrame(head_sample_rows)
 
         # Parameters sheet
         params_data = {

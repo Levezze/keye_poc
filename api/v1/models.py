@@ -2,7 +2,7 @@
 API v1 Pydantic Models
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Literal, Optional, List, Dict, Any
 from datetime import datetime
 
@@ -47,12 +47,27 @@ class SchemaResponse(BaseModel):
 class ConcentrationRequest(BaseModel):
     """Request for concentration analysis."""
 
-    group_by: str = Field(description="Column to group by")
-    value: str = Field(description="Column to aggregate")
-    time: Optional[str] = Field(None, description="Time column to use")
+    group_by: str = Field(description="Column to group by", min_length=1)
+    value: str = Field(description="Column to aggregate", min_length=1)
     thresholds: Optional[List[int]] = Field(
-        default_factory=lambda: [10, 20, 50], description="Concentration thresholds"
+        default_factory=lambda: [10, 20, 50], 
+        description="Concentration thresholds (1-99)"
     )
+    
+    @field_validator('thresholds')
+    @classmethod
+    def validate_thresholds(cls, v):
+        if v is not None:
+            if not v:  # Empty list
+                raise ValueError("Thresholds list cannot be empty")
+            if len(v) > 10:
+                raise ValueError("Maximum 10 thresholds allowed")
+            for threshold in v:
+                if threshold < 1 or threshold > 99:
+                    raise ValueError("Thresholds must be between 1 and 99")
+            if len(set(v)) != len(v):
+                raise ValueError("Duplicate thresholds not allowed")
+        return v
 
 
 class ConcentrationMetrics(BaseModel):

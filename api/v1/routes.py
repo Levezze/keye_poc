@@ -316,6 +316,7 @@ async def analyze_concentration(
                 "period": period_key,
                 "total": period_data.get("total_value", 0),
                 "concentration": concentration,
+                "head_sample": period_data.get("head_sample", []),
             }
             export_data["by_period"].append(period_export)
             
@@ -332,6 +333,7 @@ async def analyze_concentration(
             export_data["totals"] = {
                 "total": totals_data.get("total_value", 0),
                 "concentration": totals_data.get("concentration", {}),
+                "head_sample": totals_data.get("head_sample", []),
             }
         
         # Add export metadata

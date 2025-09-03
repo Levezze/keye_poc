@@ -163,8 +163,25 @@ class TestCompleteAPIWorkflow:
         assert "entity" in csv_content  # Should contain the group_by column
         assert "50" in csv_content  # Should contain custom threshold 50
         assert "75" in csv_content  # Should contain custom threshold 75
-        # Should NOT contain default thresholds
-        assert "10," not in csv_content and "20," not in csv_content
+        # Should NOT contain default thresholds (check threshold column specifically)
+        csv_lines = csv_content.split('\n')
+        threshold_values = []
+        for line in csv_lines:
+            if ',' in line and not line.startswith('#') and 'threshold' not in line:
+                parts = line.split(',')
+                if len(parts) >= 2:
+                    # Second column should be threshold in concentration metrics
+                    try:
+                        threshold_values.append(parts[1])
+                    except (IndexError, ValueError):
+                        continue
+        
+        # Verify only our custom thresholds appear
+        assert '50' in threshold_values
+        assert '75' in threshold_values 
+        # Should not have default thresholds
+        assert '10' not in threshold_values
+        assert '20' not in threshold_values
 
         # Step 5: Download Excel export
         xlsx_download_response = self.client.get(
