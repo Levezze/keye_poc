@@ -51,6 +51,9 @@ class Settings(BaseSettings):
     # Time Detection Settings
     year_range: tuple[int, int] = (1900, 2100)
     max_null_rate: float = 0.4
+    time_validation_threshold: float = 0.7  # 70% of values must be valid for time detection
+    year_range_min: int = 1900
+    year_range_max: int = 2100
 
     # Normalization Settings
     currency_symbols: list[str] = ["$", "€", "£", "¥"]

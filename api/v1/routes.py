@@ -26,6 +26,7 @@ from services.normalization_service import NormalizationService
 from core.deterministic.time import TimeDetector
 from core.deterministic.concentration import ConcentrationAnalyzer
 from services.exporters import ExportService
+from services.exceptions import DatasetNotFoundError, SchemaNotFoundError
 
 router = APIRouter()
 
@@ -183,10 +184,10 @@ async def get_schema(dataset_id: str, x_api_key: Optional[str] = Header(default=
         # Check if dataset exists
         try:
             state = registry.get_dataset_state(dataset_id)
-        except ValueError:
+        except DatasetNotFoundError as e:
             # Correct behavior: 404 when dataset does not exist
             raise HTTPException(
-                status_code=404, detail=f"Dataset {dataset_id} not found"
+                status_code=404, detail=str(e)
             )
         if not state["exists"]:
             raise HTTPException(
