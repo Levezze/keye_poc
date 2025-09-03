@@ -12,6 +12,48 @@ class TestConcentrationAnalyzer:
     
     def setup_method(self):
         self.analyzer = ConcentrationAnalyzer()
+        
+    def test_thresholds_sorted_and_allow_100(self):
+        """Test that thresholds are sorted and deduplicated, allowing 100%."""
+        df = pd.DataFrame({
+            "entity": ["A", "B", "C"], 
+            "revenue": [100, 50, 25]
+        })
+        
+        # Test unsorted thresholds with duplicates and 100%
+        result = self.analyzer.analyze(df, "entity", "revenue", thresholds=[100, 20, 10, 20])
+        
+        # Should be sorted and deduplicated: [10, 20, 100]
+        assert result.parameters["thresholds"] == [10, 20, 100]
+        
+        # Check that 100% threshold is calculated
+        concentration = result.data["TOTAL"]["concentration"]
+        assert "top_100" in concentration
+        
+        # 100% threshold should include all entities
+        top_100 = concentration["top_100"]
+        assert top_100["count"] == 3
+        assert top_100["value"] == 175.0
+        assert abs(top_100["percentage"] - 100.0) < 0.1
+        
+    def test_error_log_contains_period_on_failure(self):
+        """Test that error logs include period information when aggregation fails."""
+        # Create a DataFrame that will cause aggregation to fail
+        df = pd.DataFrame({
+            "entity": ["A", "B"],
+            "revenue": [100, "invalid"]  # Invalid data type
+        })
+        
+        result = self.analyzer.analyze(df, "entity", "revenue")
+        
+        # Should have error in computation log
+        error_logs = [log for log in result.computation_log if log.get("status") == "failed"]
+        assert len(error_logs) > 0
+        
+        # Error log should contain period information
+        error_log = error_logs[0]
+        assert "period" in error_log
+        assert error_log["period"] == "TOTAL"
     
     def test_single_period_basic_analysis(self):
         """Test basic single-period concentration analysis."""

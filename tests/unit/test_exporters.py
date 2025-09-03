@@ -14,6 +14,91 @@ from services.exporters import ExportService
 class TestExportService:
     """Test cases for ExportService."""
     
+    def test_csv_includes_top_100_and_sorted_order(self, temp_dir: Path):
+        """Test that CSV export includes top_100 threshold and maintains sorted order."""
+        # Create test data with custom thresholds including 100
+        results = {
+            "by_period": [
+                {
+                    "period": "TOTAL",
+                    "total": 1000.0,
+                    "concentration": {
+                        "top_100": {"count": 10, "value": 1000.0, "percentage": 100.0},
+                        "top_5": {"count": 1, "value": 200.0, "percentage": 20.0},
+                        "top_25": {"count": 3, "value": 600.0, "percentage": 60.0}
+                    }
+                }
+            ]
+        }
+        
+        csv_path = temp_dir / "test_sorted_thresholds.csv"
+        result_path = ExportService.export_concentration_csv(results, csv_path)
+        
+        # Read and verify
+        df = pd.read_csv(csv_path)
+        
+        # Should have 3 rows (one per threshold)
+        assert len(df) == 3
+        
+        # Verify thresholds are in sorted order
+        thresholds = df["threshold"].tolist()
+        assert thresholds == [5, 25, 100]  # Should be sorted numerically
+        
+        # Verify 100% threshold data
+        top_100_row = df[df["threshold"] == 100].iloc[0]
+        assert top_100_row["count"] == 10
+        assert top_100_row["value"] == 1000.0
+        assert top_100_row["pct_of_total"] == 100.0
+        
+    def test_excel_summary_columns_order_for_custom_thresholds(self, temp_dir: Path):
+        """Test that Excel Summary sheet has deterministic column order for custom thresholds."""
+        # Create test data with unsorted thresholds
+        results = {
+            "by_period": [
+                {
+                    "period": "2023-Q1",
+                    "total": 5000.0,
+                    "concentration": {
+                        "top_75": {"count": 8, "value": 3750.0, "percentage": 75.0},
+                        "top_5": {"count": 1, "value": 500.0, "percentage": 10.0},
+                        "top_25": {"count": 3, "value": 1250.0, "percentage": 25.0},
+                        "top_100": {"count": 10, "value": 5000.0, "percentage": 100.0}
+                    }
+                }
+            ]
+        }
+        
+        excel_path = temp_dir / "test_column_order.xlsx"
+        result_path = ExportService.export_concentration_excel(results, excel_path)
+        
+        # Read Excel file
+        workbook = load_workbook(excel_path)
+        assert "Summary" in workbook.sheetnames
+        
+        ws = workbook["Summary"]
+        
+        # Get column headers
+        headers = [cell.value for cell in ws[1]]
+        
+        # Should start with period, total, then threshold columns in sorted order
+        assert headers[0] == "period"
+        assert headers[1] == "total"
+        
+        # Find threshold-related columns and verify they're in sorted order
+        threshold_cols = [col for col in headers if col and "top_" in str(col)]
+        
+        # Extract threshold numbers for sorting verification
+        threshold_numbers = []
+        for col in threshold_cols:
+            if "_count" in col:
+                # Extract number from "top_5_count", "top_25_count", etc.
+                num = int(col.split("_")[1])
+                threshold_numbers.append(num)
+        
+        # Remove duplicates and sort to verify ordering
+        unique_thresholds = sorted(set(threshold_numbers))
+        assert unique_thresholds == [5, 25, 75, 100]
+    
     def test_export_concentration_csv(self, temp_dir: Path, sample_concentration_results: Dict[str, Any]):
         """Test CSV export with correct rows per (period, threshold)."""
         csv_path = temp_dir / "concentration_results.csv"

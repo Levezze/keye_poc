@@ -434,10 +434,10 @@ class TestCompleteAPIWorkflow:
                 threshold_data = concentration[expected_key]
                 assert "count" in threshold_data
                 assert "value" in threshold_data
-                assert "percentage" in threshold_data
+                assert "pct_of_total" in threshold_data
                 assert isinstance(threshold_data["count"], int)
                 assert isinstance(threshold_data["value"], float)
-                assert isinstance(threshold_data["percentage"], float)
+                assert isinstance(threshold_data["pct_of_total"], float)
             
             # Ensure default thresholds are NOT present
             default_keys = ["top_10", "top_20", "top_50"]
@@ -465,3 +465,52 @@ class TestCompleteAPIWorkflow:
                     # Be careful not to match substrings (e.g., "10" in "100")
                     assert f",{default_threshold}," not in csv_content and f"\n{default_threshold}," not in csv_content, \
                         f"Unexpected default threshold {default_threshold} in CSV for {case['name']}"
+    
+    def test_dynamic_thresholds_include_100(self):
+        """Test that 100% threshold is supported and shows all entities."""
+        data = {
+            "customer": ["A", "B", "C", "D", "E"],
+            "revenue": [500, 300, 150, 75, 25]  # Total: 1050
+        }
+        df = pd.DataFrame(data)
+        csv_content = df.to_csv(index=False).encode("utf-8")
+        
+        # Upload
+        upload_response = self.client.post(
+            "/api/v1/upload",
+            files={"file": ("test_100_percent.csv", csv_content, "text/csv")},
+            headers=self.headers,
+        )
+        
+        assert upload_response.status_code == 200
+        dataset_id = upload_response.json()["dataset_id"]
+        
+        # Analyze with 100% threshold
+        concentration_request = {
+            "group_by": "customer",
+            "value": "revenue", 
+            "thresholds": [25, 50, 100]
+        }
+        
+        analysis_response = self.client.post(
+            f"/api/v1/analyze/{dataset_id}/concentration",
+            json=concentration_request,
+            headers=self.headers,
+        )
+        
+        assert analysis_response.status_code == 200
+        data = analysis_response.json()
+        
+        # Verify 100% threshold is in response
+        assert 100 in data["thresholds"]
+        
+        # Verify 100% threshold in totals
+        totals = data["totals"]
+        concentration = totals.get("concentration", {})
+        assert "top_100" in concentration
+        
+        # 100% should include all entities
+        top_100 = concentration["top_100"]
+        assert top_100["count"] == 5  # All entities
+        assert top_100["value"] == 1050.0  # Total value
+        assert abs(top_100["pct_of_total"] - 100.0) < 0.1

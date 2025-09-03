@@ -57,7 +57,7 @@ class TestAPIValidation:
         assert "cannot be empty" in str(exc_info.value)
     
     def test_invalid_threshold_range(self):
-        """Test validation fails for thresholds outside 1-99 range."""
+        """Test validation fails for thresholds outside 1-100 range."""
         # Test threshold too low
         with pytest.raises(ValidationError) as exc_info:
             ConcentrationRequest(
@@ -65,26 +65,26 @@ class TestAPIValidation:
                 value="revenue",
                 thresholds=[0, 20, 50]
             )
-        assert "must be between 1 and 99" in str(exc_info.value)
+        assert "must be between 1 and 100" in str(exc_info.value)
         
         # Test threshold too high
         with pytest.raises(ValidationError) as exc_info:
             ConcentrationRequest(
                 group_by="entity",
                 value="revenue",
-                thresholds=[10, 100, 50]
+                thresholds=[10, 101, 50]
             )
-        assert "must be between 1 and 99" in str(exc_info.value)
+        assert "must be between 1 and 100" in str(exc_info.value)
     
-    def test_duplicate_thresholds(self):
-        """Test validation fails for duplicate thresholds."""
-        with pytest.raises(ValidationError) as exc_info:
-            ConcentrationRequest(
-                group_by="entity",
-                value="revenue",
-                thresholds=[10, 20, 20]
-            )
-        assert "Duplicate thresholds" in str(exc_info.value)
+    def test_duplicate_thresholds_deduplication(self):
+        """Test that duplicate thresholds are automatically deduplicated and sorted."""
+        request = ConcentrationRequest(
+            group_by="entity",
+            value="revenue",
+            thresholds=[20, 10, 20, 10]
+        )
+        # Should be deduplicated and sorted: [10, 20]
+        assert request.thresholds == [10, 20]
     
     def test_too_many_thresholds(self):
         """Test validation fails for too many thresholds."""
