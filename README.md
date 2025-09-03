@@ -19,7 +19,7 @@ A proof-of-concept data analysis pipeline that ingests Excel/CSV files, performs
 
 ```bash
 # Build and run with Docker Compose
-docker-compose up --build
+docker compose up --build
 
 # API will be available at http://localhost:8000
 ```
@@ -116,6 +116,7 @@ curl "http://localhost:8000/api/v1/download/ds_abc123/concentration.xlsx" \
 
 # Check API health
 curl "http://localhost:8000/healthz"
+```
 
 ### Demos
 
@@ -129,14 +130,62 @@ python scripts/live_llm_demo.py --dataset-id ds_...
 
 Mock dataset lives at `storage/datasets/mock_data/` and contains tiny deterministic outputs (and sample LLM artifacts) for showcase purposes.
 
+## Test Data
+
+The main test file referenced in the take-home instructions is located at `docs/instructions/KeyeExcelTakeHomeInput.xlsx` (this file and folder are gitignored due to size).
+
 ## Operational Notes
 
 - Rate limiting is enforced per IP and path at 60 requests/minute. The `/healthz` endpoint is optimized to avoid lingering throttles during readiness bursts. See `docs/decisions/0005_rate-limiting-keying-and-testability.md`.
 - Error responses are standardized and JSON-safe. Validation errors use JSON-compatible fields.
 - Accepted uploads: CSV and `.xlsx` (Excel OpenXML). Legacy `.xls` is not accepted.
-```
 
 ## Architecture
+
+### System Overview
+
+```mermaid
+flowchart TD
+    A[Excel/CSV Upload] --> B[Data Ingestion]
+    B --> C[Schema Detection]
+    C --> D[Normalization Pipeline]
+    D --> E[Time Dimension Analysis]
+    E --> F[Concentration Analysis]
+    F --> G[Export Generation]
+    F --> H[LLM Enhancement]
+    
+    C --> I[Schema Registry]
+    D --> I
+    F --> I
+    H --> I
+    
+    I --> J[Audit Trail]
+    G --> K[JSON/CSV/Excel Outputs]
+    H --> L[AI Insights]
+    
+    subgraph "Deterministic Core"
+        C
+        D
+        E
+        F
+        G
+    end
+    
+    subgraph "LLM Layer (Advisory)"
+        H
+        L
+    end
+    
+    subgraph "Storage & Audit"
+        I
+        J
+    end
+    
+    style A fill:#e1f5fe
+    style K fill:#c8e6c9
+    style L fill:#fff3e0
+    style J fill:#f3e5f5
+```
 
 ### Project Structure
 
@@ -161,7 +210,14 @@ keye-poc/
 
 ## Configuration
 
-Create a `.env` file in the project root:
+Copy the example environment file and adjust as needed:
+
+```bash
+cp .env.example .env
+# Edit .env with your actual API keys and settings
+```
+
+The `.env` file should contain:
 
 ```env
 # LLM Configuration (optional)
