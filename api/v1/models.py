@@ -51,7 +51,7 @@ class ConcentrationRequest(BaseModel):
     value: str = Field(description="Column to aggregate", min_length=1)
     thresholds: Optional[List[int]] = Field(
         default_factory=lambda: [10, 20, 50], 
-        description="Concentration thresholds (1-99)"
+        description="Concentration thresholds (1-100)"
     )
     
     @field_validator('thresholds')
@@ -62,11 +62,11 @@ class ConcentrationRequest(BaseModel):
                 raise ValueError("Thresholds list cannot be empty")
             if len(v) > 10:
                 raise ValueError("Maximum 10 thresholds allowed")
+            # Sort and deduplicate thresholds
+            v = sorted(set(v))
             for threshold in v:
-                if threshold < 1 or threshold > 99:
-                    raise ValueError("Thresholds must be between 1 and 99")
-            if len(set(v)) != len(v):
-                raise ValueError("Duplicate thresholds not allowed")
+                if threshold < 1 or threshold > 100:
+                    raise ValueError("Thresholds must be between 1 and 100")
         return v
 
 
