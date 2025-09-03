@@ -33,7 +33,10 @@ class ExportService:
             # Preferred: nested concentration dict from analyzer
             concentration = payload.get("concentration")
             if isinstance(concentration, dict) and concentration:
-                for threshold_key, metrics in concentration.items():
+                # Sort thresholds by numeric value for deterministic order
+                sorted_keys = sorted(concentration.keys(), key=lambda x: int(x.split('_')[1]) if '_' in x else 0)
+                for threshold_key in sorted_keys:
+                    metrics = concentration[threshold_key]
                     if isinstance(metrics, dict):
                         threshold_display = threshold_key.replace("top_", "")
                         try:
@@ -119,7 +122,10 @@ class ExportService:
                 # Preferred: nested concentration dict
                 concentration = period_data.get("concentration")
                 if isinstance(concentration, dict) and concentration:
-                    for threshold_key, metrics in concentration.items():
+                    # Sort thresholds by numeric value for deterministic column order
+                    sorted_keys = sorted(concentration.keys(), key=lambda x: int(x.split('_')[1]) if '_' in x else 0)
+                    for threshold_key in sorted_keys:
+                        metrics = concentration[threshold_key]
                         if isinstance(metrics, dict):
                             row[f"{threshold_key}_count"] = metrics.get("count", 0)
                             row[f"{threshold_key}_value"] = metrics.get("value", 0)
@@ -148,7 +154,10 @@ class ExportService:
             row = {"period": "TOTAL", "total": totals_data.get("total", 0)}
             concentration = totals_data.get("concentration", {})
             if isinstance(concentration, dict) and concentration:
-                for threshold_key, metrics in concentration.items():
+                # Sort thresholds by numeric value for deterministic column order
+                sorted_keys = sorted(concentration.keys(), key=lambda x: int(x.split('_')[1]) if '_' in x else 0)
+                for threshold_key in sorted_keys:
+                    metrics = concentration[threshold_key]
                     if isinstance(metrics, dict):
                         row[f"{threshold_key}_count"] = metrics.get("count", 0)
                         row[f"{threshold_key}_value"] = metrics.get("value", 0)

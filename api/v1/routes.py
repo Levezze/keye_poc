@@ -344,15 +344,32 @@ async def analyze_concentration(
             "thresholds": request.thresholds or [10, 20, 50],
         })
 
-        # Generate exports
+        # Generate exports with error handling
         analyses_path = dataset_path / "analyses"
-        csv_path = exporter.export_concentration_csv(
-            export_data, analyses_path / "concentration.csv"
-        )
-        excel_path = exporter.export_concentration_excel(
-            export_data, analyses_path / "concentration.xlsx"
-        )
-        export_paths = {"csv": csv_path, "xlsx": excel_path}
+        export_paths = {}
+        
+        try:
+            # Build all export data in memory first, then write files
+            csv_path = exporter.export_concentration_csv(
+                export_data, analyses_path / "concentration.csv"
+            )
+            export_paths["csv"] = csv_path
+            
+            excel_path = exporter.export_concentration_excel(
+                export_data, analyses_path / "concentration.xlsx"
+            )
+            export_paths["xlsx"] = excel_path
+            
+        except Exception as export_error:
+            # Log export failure but don't fail the entire analysis
+            analysis_result.computation_log.append({
+                "step": "export_generation",
+                "status": "failed", 
+                "error": str(export_error),
+                "export_formats_attempted": ["csv", "xlsx"]
+            })
+            # Continue without export files
+            export_paths = {}
 
         # Record analysis step
         registry.append_lineage_step(
@@ -413,7 +430,7 @@ async def analyze_concentration(
                     "period": period_key,
                     "total_entities": period_data.get("total_entities", 0),
                     "total_value": period_data.get("total_value", 0),
-                    "concentration": concentration,
+                    "concentration": concentration_metrics,
                 }
             else:
                 by_period.append(period_result)
@@ -432,9 +449,9 @@ async def analyze_concentration(
             by_period=by_period,
             totals=totals,
             export_links={
-                "csv": f"/api/v1/download/{dataset_id}/concentration.csv",
-                "xlsx": f"/api/v1/download/{dataset_id}/concentration.xlsx",
-            },
+                format_type: f"/api/v1/download/{dataset_id}/concentration.{format_type}"
+                for format_type in export_paths.keys()
+            } if export_paths else None,
         )
 
     except HTTPException:
