@@ -2,7 +2,7 @@
 Application Settings
 """
 
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from pathlib import Path
 from typing import Optional
 
@@ -35,7 +35,7 @@ class Settings(BaseSettings):
         "http://localhost:8000",
     ]
     api_key: Optional[str] = (
-        None  # if set, require X-API-Key header matching this value
+        "dev-key"  # if set, require X-API-Key header matching this value
     )
 
     # Analysis Settings
@@ -51,6 +51,9 @@ class Settings(BaseSettings):
     # Time Detection Settings
     year_range: tuple[int, int] = (1900, 2100)
     max_null_rate: float = 0.4
+    time_validation_threshold: float = 0.7  # 70% of values must be valid for time detection
+    year_range_min: int = 1900
+    year_range_max: int = 2100
 
     # Normalization Settings
     currency_symbols: list[str] = ["$", "€", "£", "¥"]
@@ -67,10 +70,12 @@ class Settings(BaseSettings):
     debug: bool = False
     reload: bool = True
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = False
+    # Pydantic v2-compatible settings configuration
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+    )
 
     def get_dataset_path(self, dataset_id: str) -> Path:
         """Get the path for a specific dataset."""

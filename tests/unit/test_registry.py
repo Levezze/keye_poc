@@ -9,6 +9,7 @@ from datetime import datetime
 from typing import Dict, Any
 
 from services.registry import DatasetRegistry
+from services.exceptions import DatasetNotFoundError
 
 
 class TestDatasetRegistry:
@@ -73,7 +74,7 @@ class TestDatasetRegistry:
     
     def test_get_dataset_state_nonexistent(self, registry: DatasetRegistry):
         """Test getting state of non-existent dataset."""
-        with pytest.raises(ValueError, match="Dataset nonexistent not found"):
+        with pytest.raises(DatasetNotFoundError, match="Dataset nonexistent not found"):
             registry.get_dataset_state("nonexistent")
     
     def test_append_lineage_step_basic(self, registry: DatasetRegistry, sample_lineage_step: Dict[str, Any]):
@@ -153,7 +154,7 @@ class TestDatasetRegistry:
     
     def test_append_lineage_step_nonexistent_dataset(self, registry: DatasetRegistry):
         """Test appending to non-existent dataset."""
-        with pytest.raises(ValueError, match="Lineage file not found for dataset nonexistent"):
+        with pytest.raises(DatasetNotFoundError, match="Lineage file not found for dataset nonexistent"):
             registry.append_lineage_step("nonexistent", "test_op")
     
     def test_save_and_get_schema(self, registry: DatasetRegistry, sample_schema: Dict[str, Any]):

@@ -6,6 +6,7 @@ import numpy as np
 from typing import Dict, Any, List, Optional, Tuple
 import re
 from datetime import datetime
+from config.settings import settings
 
 
 class TimeDetector:
@@ -95,13 +96,28 @@ class TimeDetector:
         """
         Compose period key based on grain and derivations.
         
+        Period key formats are designed for proper lexicographic sorting and clarity:
+        - YYYY-MM-DD: Full ISO date format (2023-01-15) for date grain
+        - YYYY-M##: Zero-padded month (2023-M01, 2023-M12) ensures proper sorting
+          (avoids issues where "2023-M9" would sort after "2023-M10")
+        - YYYY-Q#: Quarter with single digit (2023-Q1, 2023-Q4) - unambiguous
+        - YYYY: Year only (2023) for annual periods
+        - ALL: Single period indicator when no time dimension detected
+        - UNKNOWN: Fallback for invalid/missing temporal data
+        
+        The format guarantees:
+        1. Proper chronological sorting without custom comparators
+        2. Human-readable period identification
+        3. Consistent string length within each grain type
+        4. Clear distinction between different time granularities
+        
         Args:
-            df: DataFrame
+            df: DataFrame with temporal columns
             period_grain: Type of period (date, year_month, year_quarter, year, none)
             derivations: Column information from detect_time_dimensions
         
         Returns:
-            Series with period keys (YYYY-MM-DD, YYYY-M02, YYYY-Q1, YYYY, ALL)
+            Series with formatted period keys for downstream analysis
         """
         if period_grain == "none":
             return pd.Series(["ALL"] * len(df), name="period_key")
@@ -245,7 +261,7 @@ class TimeDetector:
         try:
             parsed = pd.to_datetime(sample, errors='coerce')
             valid_count = parsed.notna().sum()
-            return valid_count >= sample_size * 0.7  # 70% should parse as dates
+            return valid_count >= sample_size * settings.time_validation_threshold
         except:
             return False
     
@@ -260,8 +276,8 @@ class TimeDetector:
         
         try:
             numeric_values = pd.to_numeric(non_null, errors='coerce')
-            valid_years = numeric_values[(numeric_values >= 1900) & (numeric_values <= 2100)]
-            return len(valid_years) >= len(non_null) * 0.7  # 70% should be valid years
+            valid_years = numeric_values[(numeric_values >= settings.year_range_min) & (numeric_values <= settings.year_range_max)]
+            return len(valid_years) >= len(non_null) * settings.time_validation_threshold
         except:
             return False
     
@@ -291,7 +307,7 @@ class TimeDetector:
             if self._MONTH_NAMES.search(str_val):
                 valid_count += 1
         
-        return valid_count >= min(10, len(non_null)) * 0.7
+        return valid_count >= min(10, len(non_null)) * settings.time_validation_threshold
     
     def _validate_quarter_column(self, series: pd.Series) -> bool:
         """Validate if series contains valid quarters (1-4, Q1-Q4)."""
@@ -319,7 +335,7 @@ class TimeDetector:
             if re.match(r'^Q[1-4]$', str_val):
                 valid_count += 1
         
-        return valid_count >= min(10, len(non_null)) * 0.7
+        return valid_count >= min(10, len(non_null)) * settings.time_validation_threshold
     
     def _has_month_names(self, series: pd.Series) -> bool:
         """Check if series contains month names."""

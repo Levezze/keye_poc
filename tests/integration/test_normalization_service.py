@@ -132,7 +132,8 @@ class TestNormalizationServiceIntegration:
         
         # Check metadata
         assert schema["metadata"]["row_count"] == len(sample_dataframe)
-        assert schema["metadata"]["column_count"] == len(sample_dataframe.columns)
+        # Note: column count includes the added period_key column
+        assert schema["metadata"]["column_count"] == len(sample_dataframe.columns) + 1
         assert schema["metadata"]["has_time_dimension"] == True
     
     def test_normalization_summary(self, normalization_service, sample_dataframe):
@@ -314,6 +315,77 @@ class TestNormalizationServiceIntegration:
         
         # Verify metrics include checksum
         assert "parquet_checksum" in normalize_step["metrics"]
+    
+    def test_time_detection_integration(self, normalization_service):
+        """Test that time detection is properly integrated into the normalization pipeline."""
+        # Create DataFrame with time dimensions
+        time_df = pd.DataFrame({
+            "year": [2023, 2023, 2024, 2024],
+            "month": [1, 6, 3, 9],
+            "revenue": [1000, 1500, 1200, 1800],
+            "product": ["A", "B", "A", "B"]
+        })
+        
+        registry = normalization_service.registry
+        dataset_id = registry.create_dataset("time_test.csv")
+        
+        # Normalize and persist
+        result = normalization_service.normalize_and_persist(
+            dataset_id=dataset_id,
+            df=time_df,
+            original_filename="time_test.csv"
+        )
+        
+        # Verify period_key column was added to normalized data
+        loaded_df = normalization_service.get_normalized_data(dataset_id)
+        assert "period_key" in loaded_df.columns
+        
+        # Verify period keys are properly formatted (YYYY-M## format)
+        period_keys = loaded_df["period_key"].tolist()
+        expected_keys = ["2023-M01", "2023-M06", "2024-M03", "2024-M09"]
+        assert sorted(period_keys) == sorted(expected_keys)
+        
+        # Verify schema contains time-related fields
+        schema = normalization_service.get_schema_info(dataset_id)
+        assert "period_grain" in schema
+        assert "period_grain_candidates" in schema  
+        assert "time_candidates" in schema
+        
+        # Verify correct period grain detected
+        assert schema["period_grain"] == "year_month"
+        assert "year_month" in schema["period_grain_candidates"]
+        assert "year" in schema["time_candidates"]
+        assert "month" in schema["time_candidates"]
+    
+    def test_time_detection_no_time_columns(self, normalization_service):
+        """Test graceful handling when no time columns are detected."""
+        # Create DataFrame without time dimensions
+        no_time_df = pd.DataFrame({
+            "product": ["A", "B", "C"],
+            "revenue": [100, 200, 150],
+            "category": ["X", "Y", "Z"]
+        })
+        
+        registry = normalization_service.registry
+        dataset_id = registry.create_dataset("no_time_test.csv")
+        
+        # Normalize and persist
+        result = normalization_service.normalize_and_persist(
+            dataset_id=dataset_id,
+            df=no_time_df,
+            original_filename="no_time_test.csv"
+        )
+        
+        # Verify period_key column defaults to "ALL"
+        loaded_df = normalization_service.get_normalized_data(dataset_id)
+        assert "period_key" in loaded_df.columns
+        assert all(loaded_df["period_key"] == "ALL")
+        
+        # Verify schema shows no time detection
+        schema = normalization_service.get_schema_info(dataset_id)
+        assert schema["period_grain"] == "none"
+        assert schema["time_candidates"] == []
+        assert "No temporal dimension detected" in schema["warnings"]
 
 
 if __name__ == "__main__":
