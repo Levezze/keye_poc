@@ -33,6 +33,12 @@ class LLMValidationError(Exception):
     pass
 
 
+class NotConfiguredError(Exception):
+    """Raised when LLM provider is not configured."""
+
+    pass
+
+
 class LLMCacheEntry(BaseModel):
     """Cache entry for LLM responses."""
 
@@ -376,6 +382,10 @@ class LLMClient:
         start_time = time.time()
         provider, actual_model = self._get_provider_model(model)
 
+        # Check if provider is configured
+        if provider not in self._clients:
+            raise NotConfiguredError(f"Provider {provider} not configured")
+
         # Add JSON format instruction to system message if not present
         system_msg_found = False
         for msg in messages:
@@ -481,6 +491,133 @@ class LLMClient:
             self._usage_tracker.pop(dataset_id, None)
         else:
             self._usage_tracker.clear()
+
+    async def chat_json_with_fallback(
+        self,
+        messages: List[Dict[str, str]],
+        response_model: Optional[type] = None,
+        model: Optional[str] = None,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        request_id: Optional[str] = None,
+        dataset_id: Optional[str] = None,
+        function_name: str = "unknown",
+        context: Optional[Dict[str, Any]] = None,
+        fallback_chain: Optional[List[str]] = None,
+    ) -> Tuple[Dict[str, Any], LLMRequestMetrics]:
+        """
+        Send a JSON-formatted chat completion request with provider fallback chain.
+        
+        Tries providers in order and returns the first successful response.
+        Default fallback order: OpenAI → Gemini → Anthropic
+        
+        Args:
+            Same as chat_json, plus:
+            fallback_chain: Optional list of providers to try in order
+            
+        Returns:
+            Tuple of (parsed_json, metrics with attempt details)
+        """
+        if not fallback_chain:
+            fallback_chain = ["openai", "gemini", "anthropic"]
+        
+        original_provider = settings.llm_provider
+        attempts = []
+        last_error = None
+        
+        for provider in fallback_chain:
+            if provider not in self._clients:
+                attempts.append({
+                    "provider": provider,
+                    "status": "not_configured",
+                    "error": f"Provider {provider} not configured"
+                })
+                continue
+                
+            try:
+                # Temporarily switch provider
+                settings.llm_provider = provider
+                
+                response_json, metrics = await self.chat_json(
+                    messages=messages,
+                    response_model=response_model,
+                    model=model,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    request_id=request_id,
+                    dataset_id=dataset_id,
+                    function_name=function_name,
+                    context=context,
+                )
+                
+                # Success - add attempt info and return
+                attempts.append({
+                    "provider": provider,
+                    "status": "success",
+                    "latency_ms": metrics.latency_ms
+                })
+                
+                # Add attempt info to metrics
+                metrics.retry_count = len(attempts) - 1
+                if hasattr(metrics, 'fallback_attempts'):
+                    metrics.fallback_attempts = attempts
+                else:
+                    # Add as a dict field since metrics is a Pydantic model
+                    metrics_dict = metrics.model_dump()
+                    metrics_dict['fallback_attempts'] = attempts
+                    metrics = LLMRequestMetrics(**metrics_dict)
+                
+                return response_json, metrics
+                
+            except (openai.AuthenticationError, openai.RateLimitError, openai.APIError, NotConfiguredError) as e:
+                # These errors should trigger fallback to next provider
+                attempts.append({
+                    "provider": provider,
+                    "status": "failed",
+                    "error": str(e)[:120]
+                })
+                last_error = e
+                continue
+                
+            except Exception as e:
+                # Other errors (validation, timeout, etc.) - don't fallback
+                attempts.append({
+                    "provider": provider,
+                    "status": "error",
+                    "error": str(e)[:120]
+                })
+                last_error = e
+                break
+                
+            finally:
+                # Restore original provider
+                settings.llm_provider = original_provider
+        
+        # All providers failed
+        settings.llm_provider = original_provider
+        
+        # Create error metrics with attempt details
+        metrics = LLMRequestMetrics(
+            request_id=request_id,
+            provider=original_provider,
+            model=model or settings.llm_model,
+            latency_ms=0,
+            retry_count=len(attempts),
+            error=f"All providers failed: {str(last_error)}"
+        )
+        
+        if hasattr(metrics, 'fallback_attempts'):
+            metrics.fallback_attempts = attempts
+        else:
+            metrics_dict = metrics.model_dump()
+            metrics_dict['fallback_attempts'] = attempts
+            metrics = LLMRequestMetrics(**metrics_dict)
+        
+        # Re-raise the last error
+        if last_error:
+            raise last_error
+        else:
+            raise NotConfiguredError("No providers configured")
 
 
 # Singleton instance

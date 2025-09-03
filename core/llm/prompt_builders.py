@@ -307,7 +307,7 @@ def build_narrative_insights_prompt(
         "analysis": concentration_results,
         "schema": {
             "period_grain": schema.get("period_grain", "none"),
-            "columns": len(schema.get("columns", [])),
+            "columns": schema.get("columns", []),  # Pass the actual columns list
             "dataset_id": schema.get("dataset_id"),
         },
         "thresholds": thresholds,

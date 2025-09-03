@@ -70,6 +70,7 @@ docs/instructions/
 # Sensitive information
 .env
 .env.local
+.env.backup
 config.local.js
 *.key
 *.pem

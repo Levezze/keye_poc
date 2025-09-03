@@ -11,7 +11,7 @@ from typing import Dict, Any, Optional, List, Union, Tuple
 from datetime import datetime, UTC
 
 from config.settings import settings
-from services.llm_client import llm_client, LLMUsageError, LLMValidationError
+from services.llm_client import llm_client, LLMUsageError, LLMValidationError, NotConfiguredError
 from services.registry import DatasetRegistry
 from core.llm.types import (
     LLM_FUNCTION_MODELS, LLMStatus, LLMArtifact,
@@ -125,6 +125,12 @@ class LLMExecutor:
             )
             
             return response_json, status
+            
+        except NotConfiguredError as e:
+            # Provider not configured
+            fallback_result = self._get_fallback_response(function_name)
+            status = LLMStatus(used=False, reason="not_configured")
+            return fallback_result, status
             
         except LLMUsageError as e:
             # Usage limit exceeded
